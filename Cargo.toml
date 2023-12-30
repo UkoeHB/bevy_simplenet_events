@@ -1,0 +1,73 @@
+[package]
+name = "bevy_simplenet_events"
+description = "Event-based networking API built on bevy_simplenet"
+authors = ["koe <ukoe@protonmail.com>"]
+version = "0.0.1"
+edition = "2021"
+keywords = ["gamedev", "networking", "wasm", "events"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/UkoeHB/bevy_simplenet_events"
+
+[workspace]
+members = [
+    "bevy_simplenet_events_derive",
+]
+
+[lib]
+path = "src/lib.rs"
+test = false
+
+[[test]]
+name = "tests"
+path = "tests/test/mod.rs"
+doctest = false
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+default = ["client", "server"]
+
+# Enable clients.
+client = ["bevy_simplenet/client"]
+
+# Enable servers.
+server = ["bevy_simplenet/server"]
+
+[dependencies]
+bevy_app       = { version = "0.12" }
+bevy_ecs       = { version = "0.12" }
+bevy_simplenet = { version = "0.5", default-features = false }
+bincode        = { version = "1.3" }
+serde          = { version = "1.0" }
+serde_with     = { version = "3.0" }
+tracing        = { version = "0.1" }
+
+bevy_simplenet_events_derive = { path = "/bevy_simplenet_events_derive" }
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3" }
+
+[profile.release]
+lto           = true
+strip         = true
+codegen-units = 1
+
+[profile.release-small]
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+
+[profile.release-small.package."*"]
+opt-level = "s"
+strip = true
+
+[profile.release-wasm]
+inherits = "release-small"
+panic    = "abort"
+
+[profile.release-wasm.package."*"]
+opt-level = "s"
+strip     = true

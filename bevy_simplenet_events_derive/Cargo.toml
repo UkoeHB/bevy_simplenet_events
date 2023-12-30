@@ -1,0 +1,15 @@
+[package]
+name = "bevy_simplenet_events_derive"
+description = "Derives for bevy_simplenet events"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = { version = "1.0" }
+syn   = { version = "2.0" }
