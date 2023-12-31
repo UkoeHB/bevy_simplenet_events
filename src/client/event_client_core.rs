@@ -2,13 +2,17 @@
 use crate::*;
 
 //third-party shortcuts
+use bevy_ecs::prelude::*;
+use bevy_kot_utils::*;
+use bevy_simplenet::*;
 use bincode::Options;
 
 //standard shortcuts
-use core::fmt::Debug;
+use std::collections::HashMap;
+use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -17,107 +21,132 @@ use std::sync::atomic::{AtomicBool, Ordering};
 pub(crate) struct EventClientCore<E: EventPack>
 {
     /// Internal client.
-    client: Client<E>,
+    inner: Client<EventWrapper<E>>,
 
-    /// Internal state.
-    /// - Protected by a mutex so event clients can be accessed by multiple bevy system parameters.
-    inner: Arc<Mutex<EventClientInner>>,
+    /// Event counter.
+    counter: u32,
+
+    /// Tracks the most recent un-consumed connection message.
+    /// A value > u32::MAX is equivalent to None.
+    pending_connect: Arc<AtomicU64>,
+
+    /// Maps client requests to request/response event ids.
+    /// [ request id : (request event id, response event id) ]
+    request_sender: Sender<(u64, (u16, u16))>,
+    request_receiver: Receiver<(u64, (u16, u16))>,
+    request_map: HashMap<u64, (u16, u16)>,
 }
 
 impl<E: EventPack> EventClientCore<E>
 {
     /// Makes a new event client core.
-    pub(crate) fn new(client: Client<E>) -> Self
+    pub(crate) fn new(client: Client<EventWrapper<E>>) -> Self
     {
+        let (request_sender, request_receiver) = new_channel();
         Self{
-            client,
-            inner: Arc::new(Mutex::new(EventClientInner::default())),
+            inner           : client,
+            counter         : 0u32,
+            pending_connect : Arc::new(AtomicU64::new(u64::MAX)),
+            request_sender,
+            request_receiver,
+            request_map     : HashMap::default(),
+        }
+    }
+
+    /// Accesses the pending connect counter.
+    pub(crate) fn pending_connect(&self) -> Option<u32>
+    {
+        let counter = self.pending_connect.load(Ordering::Relaxed);
+        if counter > u32::MAX as u64 { return None; }
+        Some(counter as u32)
+    }
+
+    /// Sets a new pending connect counter.
+    pub(crate) fn set_pending_connect(&self, new: Option<u32>)
+    {
+        match new
+        {
+            Some(counter) => self.pending_connect.store(counter as u64, Ordering::Relaxed),
+            None          => self.pending_connect.store(u64::MAX, Ordering::Relaxed),
+        }
+    }
+
+    /// Clears the pending connect counter if the input counter equals it.
+    pub(crate) fn try_clear_pending_connect(&self, counter: u32)
+    {
+        if Some(counter) == self.pending_connect()
+        {
+            self.set_pending_connect(None);
         }
     }
 
     /// Sends a message to the server.
     pub(crate) fn send<T: SimplenetEvent>(&self, registry: &EventRegistry<E>, message: T) -> Result<MessageSignal, ()>
     {
-        let Ok(inner) = self.inner.lock()
-        else { tracing::error!("event client inner mutex is broken"); return Err(()); };
-
-        if !inner.can_send()
-        else { tracing::warn!("dropping client message because there is a pending connect message"); return Err(()); };
+        if self.pending_connect().is_some()
+        { tracing::warn!("dropping client message because there is a pending connect event"); return Err(()); };
 
         let Some(message_event_id) = registry.get_message_id::<T>()
         else { tracing::error!("client message type is not registered"); return Err(()); };
 
-        let Ok(ser_msg) = bincode::DefaultOptions::new().serialize(&message)
+        let Ok(data) = bincode::DefaultOptions::new().serialize(&message)
         else { tracing::error!("failed serializing client message"); return Err(()); };
 
-        self.client.send(InternalEvent{ id: message_event_id, data: ser_msg })
+        self.inner.send(InternalEvent{ id: message_event_id, data })
     }
 
     /// Sends a request to the server.
     pub(crate) fn request<Req: SimplenetEvent>(&self, registry: &EventRegistry<E>, request: Req) -> Result<RequestSignal, ()>
     {
-        let Ok(inner) = self.inner.lock()
-        else { tracing::error!("event client inner mutex is broken"); return Err(()); };
-
-        if !inner.can_send()
-        else { tracing::warn!("dropping client message because there is a pending connect message"); return Err(()); };
+        if self.pending_connect().is_some()
+        { tracing::warn!("dropping client request because there is a pending connect event"); return Err(()); };
 
         let Some(request_event_id) = registry.get_request_id::<Req>()
         else { tracing::error!("client request type is not registered"); return Err(()); };
+        let Some(response_event_id) = registry.get_response_id_from_request::<Req>()
+        else { tracing::error!("no response type registered for the given client request type"); return Err(()); };
 
-        let Ok(ser_msg) = bincode::DefaultOptions::new().serialize(&request)
+        let Ok(data) = bincode::DefaultOptions::new().serialize(&request)
         else { tracing::error!("failed serializing client message"); return Err(()); };
 
-        self.client.request(InternalEvent{ id: request_event_id, data: ser_msg })
+        let result = self.inner.request(InternalEvent{ id: request_event_id, data });
+
+        if let Ok(signal) = &result
+        {
+            // use channel since we are immutable
+            if self.request_sender.send((signal.id(), (request_event_id, response_event_id))).is_err()
+            {
+                tracing::error!("request tracker channel is broken");
+            }
+        }
+
+        result
+    }
+
+    /// Removes a request from the request tracker.
+    pub(crate) fn remove_request(&mut self, request_id: u64) -> Option<(u16, u16)>
+    {
+        // drain pending request-tracker entries now that we are mutable
+        while let Some((request_id, event_ids)) = self.request_receiver.try_recv()
+        {
+            self.request_map.insert(request_id, event_ids);
+        }
+
+        self.request_map.remove(&request_id)
     }
 
     /// Closes the client.
     pub(crate) fn close(&self)
     {
-        self.client.close();
+        self.inner.close();
     }
 
-    /// Extracts the next connection event.
-    ///
-    /// If this returns a `ClientReport::Disconnected` then events blocked by it will be unblocked.
-    pub(crate) fn next_connection(&self) -> Option<ClientReport>
+    /// Extracts the next client message.
+    pub(crate) fn next(&mut self) -> Option<(u32, ClientEventFrom<EventWrapper<E>>)>
     {
-        let Ok(mut inner) = self.inner.lock()
-        else { tracing::error!("event client inner mutex is broken"); return None; };
-
-        inner.update(&self.client);
-        inner.next_connection()
-    }
-
-    /// Extracts the next message of type `T`.
-    pub(crate) fn next_message<T: SimplenetEvent>(&self, registry: &EventRegistry<E>) -> Option<T>
-    {
-        let Some(message_event_id) = registry.get_message_id::<T>()
-        else { tracing::error!("requested simplenet message for unregistered type"); return None; };
-
-        let Ok(mut inner) = self.inner.lock()
-        else { tracing::error!("event client inner mutex is broken"); return None; };
-
-        inner.update(&self.client);
-        inner.next_message(message_event_id)
-    }
-
-    /// Extracts the next response of type `Resp` targeted at request of type `Req`.
-    pub(crate) fn next_response<Req, Resp>(&self, registry: &EventRegistry<E>) -> Option<ServerResponse<Resp>>
-    where
-        Req: SimplenetEvent,
-        Resp: SimplenetEvent,
-    {
-        let Some(request_event_id) = registry.get_request_id::<Req>()
-        else { tracing::error!("requested simplenet response for unregistered request"); return None; };
-        let Some(response_event_id) = registry.get_response_id::<Resp>()
-        else { tracing::error!("requested simplenet response for unregistered response"); return None; };
-
-        let Ok(mut inner) = self.inner.lock()
-        else { tracing::error!("event client inner mutex is broken"); return None; };
-
-        inner.update(&self.client);
-        inner.next_response::<Resp>(request_event_id, response_event_id)
+        let Some(next) = self.inner.next() else { return None; };
+        self.counter += 1;
+        Some((self.counter, next))
     }
 }
 

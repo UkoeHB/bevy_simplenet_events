@@ -39,13 +39,15 @@ server = ["bevy_simplenet/server"]
 [dependencies]
 bevy_app       = { version = "0.12" }
 bevy_ecs       = { version = "0.12" }
+bevy_kot_ecs   = { version = "0.10" }
+bevy_kot_utils = { version = "0.10" }
 bevy_simplenet = { version = "0.5", default-features = false }
 bincode        = { version = "1.3" }
 serde          = { version = "1.0" }
 serde_with     = { version = "3.0" }
 tracing        = { version = "0.1" }
 
-bevy_simplenet_events_derive = { path = "/bevy_simplenet_events_derive" }
+bevy_simplenet_events_derive = { path = "bevy_simplenet_events_derive" }
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3" }

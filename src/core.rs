@@ -2,13 +2,14 @@
 use crate::*;
 
 //third-party shortcuts
-use bevy::app::App;
-use bincode::Options;
+use bevy_app::App;
+use bevy_ecs::prelude::*;
+use bevy_simplenet::ChannelPack;
 use serde::{Serialize, Deserialize};
 use serde_with::{Bytes, serde_as};
 
 //standard shortcuts
-use core::fmt::Debug;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -17,18 +18,24 @@ use std::marker::PhantomData;
 fn setup_simplenet_event_framwork<E: EventPack>(app: &mut App)
 {
     // only set up once
-    if app.contains_resource::<EventRegistry<E>>() { return; }
+    if app.world.contains_resource::<EventRegistry<E>>() { return; }
 
     // add event registry
     // - this can only be done from within this crate
     app.init_resource::<EventRegistry<E>>();
 
-    // prepare connection events
+    // prepare internals
     #[cfg(feature = "server")]
-    { self.add_event::<InnerBevyServerConnection<E>>(); }
+    {
+        app.init_resource::<EventQueueConnectorServer<E>>();
+        app.init_resource::<ServerConnectionQueue<E>>();
+    }
 
     #[cfg(feature = "client")]
-    { self.add_event::<InnerBevyClientConnection<E>>(); }
+    {
+        app.init_resource::<EventQueueConnectorClient<E>>();
+        app.init_resource::<ClientConnectionQueue<E>>();
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -47,12 +54,18 @@ pub struct InternalEvent
 //-------------------------------------------------------------------------------------------------------------------
 
 /// Wrapper trait that carries channel type information.
-pub trait EventPack: Clone + Debug + 'static
+pub trait EventPack: Clone + Debug + Send + Sync + 'static
 {
     type ConnectMsg: Clone + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static;
 }
 
-impl<C, E: EventPack<ConnectMsg = C>> ChannelPack for E
+/// Wrapper struct for carrying type information.
+#[derive(Clone, Debug)]
+pub struct EventWrapper<E: EventPack>(PhantomData<E>);
+
+impl<C, E: EventPack<ConnectMsg = C>> ChannelPack for EventWrapper<E>
+where
+    C: Clone + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static
 {
     type ConnectMsg = C;
     type ClientMsg = InternalEvent;
@@ -60,6 +73,8 @@ impl<C, E: EventPack<ConnectMsg = C>> ChannelPack for E
     type ServerMsg = InternalEvent;
     type ServerResponse = InternalEvent;
 }
+
+impl<E: EventPack> Default for EventWrapper<E> { fn default() -> Self { Self(PhantomData::default()) } }
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -76,53 +91,81 @@ impl SimplenetEvent for () {}
 
 //-------------------------------------------------------------------------------------------------------------------
 
+/// Contains refresh systems for the event framework backend.
+#[derive(SystemSet, Debug, Copy, Clone, Eq, PartialEq, Hash, Default)]
+pub struct RefreshSet;
+
+//-------------------------------------------------------------------------------------------------------------------
+
 pub trait SimplenetEventAppExt
 {
-    /// Registers a message event.
+    /// Registers a client-sent message event.
     ///
     /// Server and client binaries must register events in the same order.
+    fn register_simplenet_client_message<E: EventPack, T: SimplenetEvent>(&mut self) -> &mut Self;
+
+    /// Registers a server-sent message event.
     ///
-    /// If both the client and server can send messages of type `T`, then you only need to register the message type once
-    /// even if the client and server are in the same app.
-    fn register_message<E: EventPack, T: SimplenetEvent>(&mut self) -> &mut Self;
+    /// Server and client binaries must register events in the same order.
+    fn register_simplenet_server_message<E: EventPack, T: SimplenetEvent>(&mut self) -> &mut Self;
 
     /// Registers a request-response event.
     ///
     /// Server and client binaries must register events in the same order.
     ///
     /// If you only want to send acks for this request, then you may use `()` for the response type.
-    fn register_request_response<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(&mut self) -> &mut Self;
+    fn register_simplenet_request_response<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(&mut self) -> &mut Self;
 }
 
 impl SimplenetEventAppExt for App
 {
-    fn register_simplenet_message<E: EventPack, T: SimplenetEvent>(&mut self) -> &mut Self
+    fn register_simplenet_client_message<E: EventPack, T: SimplenetEvent>(&mut self) -> &mut Self
     {
         // setup
         setup_simplenet_event_framwork::<E>(self);
 
-        // register type
-        self.world
-            .resource_mut::<EventRegistry<E>>()
-            .register_message::<T>();
-
-        // add event
-        #[cfg(feature = "server")]
-        { self.add_event::<InnerBevyMessageServer<E, T>>(); }
-
         #[cfg(feature = "client")]
-        { self.add_event::<InnerBevyMessageClient<E, T>>(); }
+        {
+            // register type
+            let message_event_id = self.world
+                .resource_mut::<EventRegistry<E>>()
+                .register_message::<T>();
+
+            // register event
+            self.world.resource_mut::<EventQueueConnectorClient<E>>().register_message::<T>(message_event_id);
+            self.init_resource::<ClientMessageQueue<E, T>>();
+        }
 
         self
     }
 
-    fn register_simplenet_request<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(&mut self) -> &mut Self
+    fn register_simplenet_server_message<E: EventPack, T: SimplenetEvent>(&mut self) -> &mut Self
+    {
+        // setup
+        setup_simplenet_event_framwork::<E>(self);
+
+        #[cfg(feature = "server")]
+        {
+            // register type
+            let message_event_id = self.world
+                .resource_mut::<EventRegistry<E>>()
+                .register_message::<T>();
+
+            // register event
+            self.world.resource_mut::<EventQueueConnectorServer<E>>().register_message::<T>(message_event_id);
+            self.init_resource::<ServerMessageQueue<T>>();
+        }
+
+        self
+    }
+
+    fn register_simplenet_request_response<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(&mut self) -> &mut Self
     {
         // setup
         setup_simplenet_event_framwork::<E>(self);
 
         // register type
-        self.world
+        let (request_event_id, response_event_id) = self.world
             .resource_mut::<EventRegistry<E>>()
             .register_request_response::<Req, Resp>();
 
@@ -130,10 +173,20 @@ impl SimplenetEventAppExt for App
         // - requests are read on the server
         // - responses are read on the client
         #[cfg(feature = "server")]
-        { self.add_event::<InnerBevyRequest<E, Req, Resp>>(); }
+        {
+            self.world
+                .resource_mut::<EventQueueConnectorServer<E>>()
+                .register_response::<E, Req, Resp>(request_event_id, response_event_id);
+            self.init_resource::<ServerRequestQueue<Req, Resp>>();
+        }
 
         #[cfg(feature = "client")]
-        { self.add_event::<InnerBevyResponse<E, Req, Resp>>(); }
+        {
+            self.world
+                .resource_mut::<EventQueueConnectorClient<E>>()
+                .register_request::<Req, Resp>(request_event_id, response_event_id);
+            self.init_resource::<ClientResponseQueue<E, Req, Resp>>();
+        }
 
         self
     }

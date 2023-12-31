@@ -2,10 +2,13 @@
 use crate::*;
 
 //third-party shortcuts
+use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemParam;
+use bevy_simplenet::{MessageSignal, RequestSignal};
 use bincode::Options;
 
 //standard shortcuts
-use core::fmt::Debug;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,21 +17,25 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Event client used to send messages and requests, and close the client.
 #[derive(SystemParam)]
-pub struct EventClient<'w, 's, E: EventPack>
+pub struct EventClient<'w, E: EventPack>
 {
     client   : Res<'w, EventClientCore<E>>,
     registry : Res<'w, EventRegistry<E>>,
 }
 
-impl<E: EventPack> EventClient<E>
+impl<'w, E: EventPack> EventClient<'w, E>
 {
     /// Sends a message to the server.
-    pub fn send(&self, message: E::ClientMsg) -> Result<MessageSignal, ()>
+    ///
+    /// This will fail if there is a pending `ClientReport::Connected` that hasn't been read by any systems.
+    pub fn send<T: SimplenetEvent>(&self, message: T) -> Result<MessageSignal, ()>
     {
         self.client.send(&self.registry, message)
     }
 
     /// Sends a request to the server.
+    ///
+    /// This will fail if there is a pending `ClientReport::Connected` that hasn't been read by any systems.
     pub fn request<Req: SimplenetEvent>(&self, request: Req) -> Result<RequestSignal, ()>
     {
         self.client.request(&self.registry, request)
@@ -37,7 +44,7 @@ impl<E: EventPack> EventClient<E>
     /// Closes the client.
     ///
     /// All messages and requests submitted after this is called will fail to send.
-    pub fn close(&self) -> Result<MessageSignal, ()>
+    pub fn close(&self)
     {
         self.client.close()
     }

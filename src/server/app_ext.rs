@@ -15,15 +15,13 @@ use std::marker::PhantomData;
 
 pub trait SimplenetServerEventAppExt
 {
-    /// Inserts a `bevy_simplenet` server.
-    ///
-    /// This must be called on your app in order to use [`EventServer`].
-    fn insert_server<E: EventPack>(&mut self, server: Server<E>) -> &mut Self;
+    /// Prepars a `bevy_simplenet` server for use in [`EventServer`].
+    fn insert_simplenet_server<E: EventPack>(&mut self, server: Server<E>) -> &mut Self;
 }
 
 impl SimplenetServerEventAppExt for App
 {
-    fn insert_server<E: EventPack>(&mut self, server: Server<E>) -> &mut Self
+    fn insert_simplenet_server<E: EventPack>(&mut self, server: Server<E>) -> &mut Self
     {
         self.insert_resource(EventServerCore::new(server));
         self

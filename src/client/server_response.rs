@@ -12,15 +12,15 @@ use crate::*;
 pub enum ServerResponse<T: SimplenetEvent>
 {
     /// Response from the server.
-    Response(T),
+    Response(T, u64),
     /// Request is acknowledged. No response will be sent.
-    Ack,
+    Ack(u64),
     /// Request is rejected. No response will be sent.
-    Reject,
+    Reject(u64),
     /// Sending a request failed.
-    SendFailed,
+    SendFailed(u64),
     /// The server received a request but the client failed to receive a response.
-    ResponseLost,
+    ResponseLost(u64),
 }
 
 //-------------------------------------------------------------------------------------------------------------------

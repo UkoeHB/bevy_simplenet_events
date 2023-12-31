@@ -2,109 +2,74 @@
 use crate::*;
 
 //third-party shortcuts
-use bincode::Options;
+use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemParam;
+use bevy_simplenet::ClientReport;
 
 //standard shortcuts
-use core::fmt::Debug;
+use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 //-------------------------------------------------------------------------------------------------------------------
 
 /// Client reader for client connection events.
 #[derive(SystemParam)]
-pub struct ClientConnectionReader<'w, 's, E: EventPack>
+pub struct ClientConnectionReader<'w, E: EventPack>
 {
     client : Res<'w, EventClientCore<E>>,
-    reader : Local<'s, ManualEventReader<InnerBevyClientConnection<E>>>,
-    events : ResMut<'w, Events<InnerBevyMessageClient<E, T>>>,
+    events : Res<'w, ClientConnectionQueue<E>>,
 }
 
-impl<'w, 's, E: EventPack, T: SimplenetEvent> ClientMessageReader<'w, 's, E, T>
+impl<'w, E: EventPack> ClientConnectionReader<'w, E>
 {
-    /// Gets the next available message event.
-    ///
-    /// Each call to this method synchronizes with calls to [`ClientConnectionReader::next`].
-    pub fn next(&mut self) -> Option<&T>
+    /// Iterates the available connection reports.
+    pub fn iter(&self) -> impl Iterator<Item = &ClientReport> + '_
     {
-        // insert an event if we have no events
-        if self.reader.len(&self.events) == 0
-        {
-            if let Some(message) = self.client.next_connection::<T>()
-            {
-                self.events.send(InnerBevyMessageClient{ message, phantom: PhantomData::default() });
-            }
-        }
-
-        // get the next available message
-        self.reader.read(&self.events).next()
+        self.events
+            .iter()
+            .map(|(counter, report)|
+                {
+                    self.client.try_clear_pending_connect(*counter);
+                    report
+                }
+            )
     }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 
-/// Client reader for server-sent messages.
+/// Client reader for server messages.
 #[derive(SystemParam)]
-pub struct ClientMessageReader<'w, 's, E: EventPack, T: SimplenetEvent>
+pub struct ClientMessageReader<'w, E: EventPack, T: SimplenetEvent>
 {
-    client   : Res<'w, EventClientCore<E>>,
-    registry : Res<'w, EventRegistry>,
-    reader   : Local<'s, ManualEventReader<InnerBevyMessageClient<E, T>>>,
-    events   : ResMut<'w, Events<InnerBevyMessageClient<E, T>>>,
+    events: Res<'w, ClientMessageQueue<E, T>>,
 }
 
-impl<'w, 's, E: EventPack, T: SimplenetEvent> ClientMessageReader<'w, 's, E, T>
+impl<'w, E: EventPack, T: SimplenetEvent> ClientMessageReader<'w, E, T>
 {
-    /// Gets the next available message event.
-    ///
-    /// Each call to this method synchronizes with calls to [`ClientConnectionReader::next`].
-    pub fn next(&mut self) -> Option<&T>
+    /// Iterates the available server messages.
+    pub fn iter(&self) -> impl Iterator<Item = &T> + '_
     {
-        // insert an event if we have no events
-        if self.reader.len(&self.events) == 0
-        {
-            if let Some(message) = self.client.next_message::<T>(&self.registry)
-            {
-                self.events.send(InnerBevyMessageClient{ message, phantom: PhantomData::default() });
-            }
-        }
-
-        // get the next available message
-        self.reader.read(&self.events).next()
+        self.events.iter()
     }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 
-/// Client reader for server-sent responses to client requests.
+/// Client reader for server responses to client requests.
 #[derive(SystemParam)]
-pub struct ClientResponseReader<'w, 's, E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>
+pub struct ClientResponseReader<'w, E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>
 {
-    client   : Res<'w, EventClientCore<E>>,
-    registry : Res<'w, EventRegistry>,
-    reader   : Local<'s, ManualEventReader<InnerBevyResponse<E, Req, Resp>>>,
-    events   : ResMut<'w, Events<InnerBevyResponse<E, Req, Resp>>>,
+    events: Res<'w, ClientResponseQueue<E, Req, Resp>>,
 }
 
-impl<'w, 's, E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ClientResponseReader<'w, 's, E, Req, Resp>
+impl<'w, E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ClientResponseReader<'w, E, Req, Resp>
 {
-    /// Gets the next available response event.
-    ///
-    /// Each call to this method synchronizes with calls to [`ClientConnectionReader::next`].
-    pub fn next(&mut self) -> Option<&Resp>
+    /// Iterates the available server responses.
+    pub fn iter(&self) -> impl Iterator<Item = &ServerResponse<Resp>> + '_
     {
-        // insert an event if we have no events
-        if self.reader.len(&self.events) == 0
-        {
-            if let Some(response) = self.client.next_response::<Req, Resp>(&self.registry)
-            {
-                self.events.send(InnerBevyResponse{ response, phantom: PhantomData::default() });
-            }
-        }
-
-        // get the next available message
-        self.reader.read(&self.events).next()
+        self.events.iter()
     }
 }
 

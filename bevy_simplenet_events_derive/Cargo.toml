@@ -1,11 +1,9 @@
 [package]
 name = "bevy_simplenet_events_derive"
 description = "Derives for bevy_simplenet events"
-authors.workspace = true
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
+version = "0.0.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
 
 [lib]
 proc-macro = true
