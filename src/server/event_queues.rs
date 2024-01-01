@@ -66,8 +66,16 @@ impl<E: EventPack, T: SimplenetEvent> ServerMessageQueue<E, T>
     {
         self.queue
             .iter_mut()
-            .filter_map(|i| i)
-            .filter(|i| i.0 == session_id)
+            .filter(
+                |i|
+                {
+                    match i
+                    {
+                        Some(i) => i.0 == session_id,
+                        None    => false,
+                    }
+                }
+            )
             .for_each(|i| { i = None; });
     }
 
@@ -109,8 +117,16 @@ impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ServerRequestQueue
     {
         self.queue
             .iter_mut()
-            .filter_map(|i| i)
-            .filter(|i| i.0.client_id() == session_id)
+            .filter(
+                |i|
+                {
+                    match i
+                    {
+                        Some(i) => i.0.client_id() == session_id,
+                        None    => false,
+                    }
+                }
+            )
             .for_each(|i| { i = None; });
     }
 

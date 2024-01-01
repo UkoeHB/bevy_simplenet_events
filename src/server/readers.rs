@@ -71,7 +71,7 @@ pub struct ServerRequestSource<'w, E: EventPack, Req: SimplenetEvent, Resp: Simp
 impl<'w, E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ServerRequestSource<'w, E, Req, Resp>
 {
     /// Drains all available client requests.
-    pub fn drain(&mut self) -> impl Iterator<Item = (SessionId, Req, RequestToken)> + '_
+    pub fn drain(&mut self) -> impl Iterator<Item = (RequestToken, Req)> + '_
     {
         self.events.drain()
     }

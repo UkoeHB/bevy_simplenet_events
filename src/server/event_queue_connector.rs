@@ -18,15 +18,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-struct PendingResponse
-{
-    request_id: u64,
-    data: PendingResponseData,
-}
-
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-
 fn clear_connection_queue<E: EventPack>(mut queue: ResMut<ServerConnectionQueue<E>>)
 {
     queue.clear();
@@ -91,7 +82,8 @@ fn send_message<E: EventPack, T: SimplenetEvent>(
 //-------------------------------------------------------------------------------------------------------------------
 
 fn send_request<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(
-    In((request_token, data)): In<(RequestToken, Vec<u8>)>, mut queue: ResMut<ServerRequestQueue<E, Req, Resp>>
+    In((request_token, data)) : In<(RequestToken, Vec<u8>)>,
+    mut queue                 : ResMut<ServerRequestQueue<E, Req, Resp>>
 ){
     let Ok(request) = bincode::DefaultOptions::new().deserialize(&data[..])
     else
@@ -121,7 +113,7 @@ pub(crate) struct EventQueueConnectorServer<E: EventPack>
     /// [ response event id : [ request event id : callback ] ]
     send_requests: HashMap<u16, HashMap<u16, CallbackWith<(), (RequestToken, Vec<u8>)>>>,
 
-    phantom: PhantomData<E>
+    phantom: PhantomData<E>,
 }
 
 impl<E: EventPack> EventQueueConnectorServer<E>
@@ -186,13 +178,13 @@ impl<E: EventPack> EventQueueConnectorServer<E>
 
     pub(crate) fn handle_disconnect(&self, world: &mut World, session_id: SessionId)
     {
-        // clear messages
+        // clear messages for this client
         for cb in self.clear_message_queues.iter()
         {
             cb.call_with(Some(session_id)).apply(world);
         }
 
-        // clear requests
+        // clear requests for this client
         for cb in self.clear_request_queues.iter()
         {
             cb.call_with(Some(session_id)).apply(world);

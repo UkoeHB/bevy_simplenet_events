@@ -40,7 +40,7 @@ impl<'w, E: EventPack> EventServer<'w, E>
     /// Acknowledges a client request.
     pub fn ack(&self, token: RequestToken) -> Result<(), ()>
     {
-        self.server.ack(&self.registry, token, response)
+        self.server.ack(&self.registry, token)
     }
 
     /// Rejects a client request.
