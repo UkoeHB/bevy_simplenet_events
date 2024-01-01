@@ -142,18 +142,25 @@ impl<E: EventPack> EventClientCore<E>
     }
 
     /// Extracts the next client message.
-    pub(crate) fn next(&mut self) -> Option<(u32, ClientEventFrom<EventWrapper<E>>)>
+    pub(crate) fn next(&mut self) -> Option<(u32, ServerEventFrom<EventWrapper<E>>)>
     {
-        let Some(next) = self.inner.next() else { return None; };
+        let Some((session_id, next)) = self.inner.next() else { return None; };
         self.counter += 1;
 
         match *next
         {
-            ClientEventFrom::<EventWrapper<E>>::Report(ClientReport::Connected) => self.set_pending_connect(Some(counter)),
+            ServerEventFrom::<EventWrapper<E>>::Report(ClientReport::Connected) =>
+            {
+                self.set_pending_connect(session_id, Some(counter));
+            }
+            ServerEventFrom::<EventWrapper<E>>::Report(ClientReport::Disconnected) =>
+            {
+                //todo: clear client entry
+            }
             _ => ()
         }
 
-        Some((self.counter, next))
+        Some((self.counter, session_id, next))
     }
 }
 

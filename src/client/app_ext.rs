@@ -39,7 +39,6 @@ fn drain_client<E: EventPack>(world: &mut World)
             {
                 match &report
                 {
-                    ClientReport::Connected    => pending_connect = Some(counter),
                     ClientReport::Disconnected => queues.handle_disconnect(world),
                     _                          => ()
                 }
@@ -84,7 +83,6 @@ fn drain_client<E: EventPack>(world: &mut World)
             }
         }
     }
-    client.set_pending_connect(pending_connect);
 
     world.insert_resource(client);
     world.insert_resource(queues);

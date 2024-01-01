@@ -9,8 +9,8 @@ mod event_registry;
 
 #[cfg(feature = "client")]
 mod client;
-//#[cfg(feature = "server")]
-//mod server;
+#[cfg(feature = "server")]
+mod server;
 
 //API exports
 pub use crate::core::*;
@@ -18,5 +18,5 @@ pub use crate::event_registry::*;
 
 #[cfg(feature = "client")]
 pub use crate::client::*;
-//#[cfg(feature = "server")]
-//pub use crate::server::*;
+#[cfg(feature = "server")]
+pub use crate::server::*;

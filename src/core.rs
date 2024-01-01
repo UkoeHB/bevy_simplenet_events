@@ -59,7 +59,7 @@ pub trait EventPack: Clone + Debug + Send + Sync + 'static
     type ConnectMsg: Clone + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static;
 }
 
-/// Wrapper struct for carrying type information.
+/// Wrapper struct for carrying type information when constructing clients and servers.
 #[derive(Clone, Debug)]
 pub struct EventWrapper<E: EventPack>(PhantomData<E>);
 
@@ -176,7 +176,7 @@ impl SimplenetEventAppExt for App
         {
             self.world
                 .resource_mut::<EventQueueConnectorServer<E>>()
-                .register_response::<E, Req, Resp>(request_event_id, response_event_id);
+                .register_request::<E, Req, Resp>(request_event_id, response_event_id);
             self.init_resource::<ServerRequestQueue<Req, Resp>>();
         }
 
@@ -184,7 +184,7 @@ impl SimplenetEventAppExt for App
         {
             self.world
                 .resource_mut::<EventQueueConnectorClient<E>>()
-                .register_request::<Req, Resp>(request_event_id, response_event_id);
+                .register_response::<Req, Resp>(request_event_id, response_event_id);
             self.init_resource::<ClientResponseQueue<E, Req, Resp>>();
         }
 

@@ -151,7 +151,7 @@ impl<E: EventPack> EventQueueConnectorClient<E>
         ).unwrap();
     }
 
-    pub(crate) fn register_response<Req: SimplenetEvent, Resp: SimplenetEvent>(
+    pub(crate) fn register_request<Req: SimplenetEvent, Resp: SimplenetEvent>(
         &mut self,
         request_event_id: u16,
         response_event_id: u16

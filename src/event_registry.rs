@@ -6,7 +6,7 @@ use bevy_ecs::prelude::*;
 
 //standard shortcuts
 use std::any::TypeId;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -20,9 +20,11 @@ pub(crate) struct EventRegistry<E: EventPack>
 {
     id_counter           : u16,
     message_map          : HashMap<TypeId, u16>,
+    message_ids          : HashSet<u16>,
     request_map          : HashMap<TypeId, u16>,
     response_map         : HashMap<TypeId, u16>,
     request_response_map : HashMap<TypeId, TypeId>,
+    request_response_ids : HashMap<u16, u16>,
     phantom              : PhantomData<E>
 }
 
@@ -39,6 +41,7 @@ impl<E: EventPack> EventRegistry<E>
         let id = self.id_counter;
 
         self.message_map.insert(type_id, id).unwrap();
+        self.message_ids.insert(id).unwrap();
 
         id
     }
@@ -56,6 +59,7 @@ impl<E: EventPack> EventRegistry<E>
         self.request_map.insert(req_type_id, req_id).expect("simplenet requests may only be registered once");
         let _ = self.response_map.insert(resp_type_id, resp_id);  //allow reentry
         self.request_response_map.insert(req_type_id, resp_type_id).unwrap();
+        self.request_response_ids.insert(req_id, resp_id).unwrap();
 
         (req_id, resp_id)
     }
@@ -63,6 +67,11 @@ impl<E: EventPack> EventRegistry<E>
     pub(crate) fn get_message_id<T>(&self) -> Option<u16>
     {
         self.message_map.get(&std::any::TypeId::of::<T>()).map(|i| *i)
+    }
+
+    pub(crate) fn has_message_id(&self, id: u16) -> bool
+    {
+        self.message_ids.contains(&id)
     }
 
     pub(crate) fn get_request_id<Req>(&self) -> Option<u16>
@@ -86,6 +95,11 @@ impl<E: EventPack> EventRegistry<E>
             )
             .flatten()
     }
+
+    pub(crate) fn get_response_id_from_request_id(&self, request_event_id: u16) -> Option<u16>
+    {
+        self.request_response_ids.get(&request_event_id)
+    }
 }
 
 impl<E: EventPack> Default for EventRegistry<E>
@@ -98,6 +112,7 @@ impl<E: EventPack> Default for EventRegistry<E>
             request_map          : HashMap::default(),
             response_map         : HashMap::default(),
             request_response_map : HashMap::default(),
+            request_response_ids : HashMap::default(),
             phantom              : PhantomData::default(),
         }
     }

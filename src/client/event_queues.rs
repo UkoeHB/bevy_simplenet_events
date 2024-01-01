@@ -44,7 +44,7 @@ impl<E: EventPack> ClientConnectionQueue<E>
 
 impl<E: EventPack> Default for ClientConnectionQueue<E>
 {
-    fn default() -> Self { Self{ queue: Vec::default(), phantom: PhantomData::default() }}
+    fn default() -> Self { Self{ queue: Vec::default(), phantom: PhantomData::default() } }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -76,7 +76,7 @@ impl<E: EventPack, T: SimplenetEvent> ClientMessageQueue<E, T>
 
 impl<E: EventPack, T: SimplenetEvent> Default for ClientMessageQueue<E, T>
 {
-    fn default() -> Self { Self{ queue: Vec::default(), phantom: PhantomData::default() }}
+    fn default() -> Self { Self{ queue: Vec::default(), phantom: PhantomData::default() } }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -123,7 +123,7 @@ impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ClientResponseQueu
 
 impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> Default for ClientResponseQueue<E, Req, Resp>
 {
-    fn default() -> Self { Self{ queue: Vec::default(), phantom: PhantomData::default() }}
+    fn default() -> Self { Self{ queue: Vec::default(), phantom: PhantomData::default() } }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
