@@ -4,13 +4,11 @@ use crate::*;
 //third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
-use bevy_simplenet::{MessageSignal, RequestSignal};
+use bevy_simplenet::{CloseFrame, MessageSignal, RequestSignal};
 use bincode::Options;
 
 //standard shortcuts
 use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -19,7 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[derive(SystemParam)]
 pub struct EventServer<'w, E: EventPack>
 {
-    client   : Res<'w, EventServerCore<E>>,
+    server   : Res<'w, EventServerCore<E>>,
     registry : Res<'w, EventRegistry<E>>,
 }
 

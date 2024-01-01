@@ -27,7 +27,7 @@ struct PendingResponse
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn clear_connection_queue<E: EventPack>(mut queue: ResMut<ClientConnectionQueue<E>>)
+fn clear_connection_queue<E: EventPack>(mut queue: ResMut<ServerConnectionQueue<E>>)
 {
     queue.clear();
 }
@@ -35,118 +35,110 @@ fn clear_connection_queue<E: EventPack>(mut queue: ResMut<ClientConnectionQueue<
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn clear_message_queue<E: EventPack, T: SimplenetEvent>(mut queue: ResMut<ClientMessageQueue<E, T>>)
-{
-    queue.clear();
-}
-
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-
-fn clear_response_queue<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(
-    mut queue: ResMut<ClientResponseQueue<E, Req, Resp>>
+fn clear_message_queue<E: EventPack, T: SimplenetEvent>(
+    In(session_id) : In<Option<SessionId>>,
+    mut queue      : ResMut<ServerMessageQueue<E, T>>
 ){
-    queue.clear();
+    match session_id
+    {
+        Some(session_id) => queue.clear_session(session_id),
+        None             => queue.clear(),
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn reset_response_queue<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(
-    mut queue: ResMut<ClientResponseQueue<E, Req, Resp>>
+fn clear_request_queue<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(
+    In(session_id) : In<Option<SessionId>>,
+    mut queue      : ResMut<ServerRequestQueue<E, Req, Resp>>
 ){
-    queue.reset();
+    match session_id
+    {
+        Some(session_id) => queue.clear_session(session_id),
+        None             => queue.clear(),
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn send_connection<E: EventPack>(In((counter, report)): In<(u32, ClientReport)>, mut queue: ResMut<ClientConnectionQueue<E>>)
-{
-    queue.send(counter, report);
+fn send_connection<E: EventPack>(
+    In((counter, session_id, report)) : In<(u32, SessionId, ServerReport<E::ConnectMsg>)>,
+    mut queue                         : ResMut<ServerConnectionQueue<E>>
+){
+    queue.send(counter, session_id, report);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn send_message<E: EventPack, T: SimplenetEvent>(In(data): In<Vec<u8>>, mut queue: ResMut<ClientMessageQueue<E, T>>)
-{
+fn send_message<E: EventPack, T: SimplenetEvent>(
+    In((session_id, data)) : In<(SessionId, Vec<u8>)>,
+    mut queue              : ResMut<ServerMessageQueue<E, T>>
+){
     let Ok(message) = bincode::DefaultOptions::new().deserialize(&data[..])
     else
     {
-        tracing::warn!("received server message that failed to deserialize");
+        tracing::warn!("received client message that failed to deserialize");
         return;
     };
 
-    queue.send(message);
+    queue.send(session_id, message);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn send_response<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(
-    In(response): In<PendingResponse>, mut queue: ResMut<ClientResponseQueue<E, Req, Resp>>
+fn send_request<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(
+    In((request_token, data)): In<(RequestToken, Vec<u8>)>, mut queue: ResMut<ServerRequestQueue<E, Req, Resp>>
 ){
-    let response = match response.data
+    let Ok(request) = bincode::DefaultOptions::new().deserialize(&data[..])
+    else
     {
-        PendingResponseData::Response(data) =>
-        {
-            let Ok(resp_ser) = bincode::DefaultOptions::new().deserialize(&data[..])
-            else
-            {
-                tracing::warn!("received server response that failed to deserialize");
-                return;
-            };
-            ServerResponse::<Resp>::Response(resp_ser, response.request_id)
-        }
-        PendingResponseData::Ack          => ServerResponse::Ack(response.request_id),
-        PendingResponseData::Reject       => ServerResponse::Reject(response.request_id),
-        PendingResponseData::SendFailed   => ServerResponse::SendFailed(response.request_id),
-        PendingResponseData::ResponseLost => ServerResponse::ResponseLost(response.request_id),
+        tracing::warn!("received client request that failed to deserialize");
+        return;
     };
 
-    queue.send(response);
+    queue.send(request_token, request);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-/// Exposes access to registered event queues.
+/// Provides access to registered event queues.
 #[derive(Resource)]
-pub(crate) struct EventQueueConnectorClient<E: EventPack>
+pub(crate) struct EventQueueConnectorServer<E: EventPack>
 {
     /// Cached systems for clearing event queues.
-    clear_message_queues: Vec<Callback<()>>,
-    clear_response_queues: Vec<Callback<()>>,
-
-    /// Cached systems for resetting stale responses.
-    reset_response_queues: Vec<Callback<()>>,
+    clear_message_queues: Vec<CallbackWith<(), Option<SessionId>>>,
+    clear_request_queues: Vec<CallbackWith<(), Option<SessionId>>>,
 
     /// Cached systems for sending message events.
     /// [ message event id : callback ]
-    send_messages: HashMap<u16, CallbackWith<(), Vec<u8>>>,
+    send_messages: HashMap<u16, CallbackWith<(), (SessionId, Vec<u8>)>>,
     /// Cached systems for sending response events.
     /// [ response event id : [ request event id : callback ] ]
-    send_responses: HashMap<u16, HashMap<u16, CallbackWith<(), PendingResponse>>>,
+    send_requests: HashMap<u16, HashMap<u16, CallbackWith<(), (RequestToken, Vec<u8>)>>>,
 
     phantom: PhantomData<E>
 }
 
-impl<E: EventPack> EventQueueConnectorClient<E>
+impl<E: EventPack> EventQueueConnectorServer<E>
 {
     pub(crate) fn register_message<T: SimplenetEvent>(&mut self, message_event_id: u16)
     {
         // add clear-message
-        self.clear_message_queues.push(Callback::new(
-            |world: &mut World| { syscall(world, (), clear_message_queue::<E, T>); }
+        self.clear_message_queues.push(CallbackWith::new(
+            |world: &mut World, target: Option<SessionId>| { syscall(world, target, clear_message_queue::<E, T>); }
         ));
 
         // add send-message
         self.send_messages.insert(
             message_event_id,
             CallbackWith::new(
-                |world: &mut World, data: Vec<u8>|
-                { syscall(world, data, send_message::<E, T>); }
+                |world: &mut World, package: (SessionId, Vec<u8>)|
+                { syscall(world, package, send_message::<E, T>); }
             )
         ).unwrap();
     }
@@ -157,24 +149,19 @@ impl<E: EventPack> EventQueueConnectorClient<E>
         response_event_id: u16
     ){
         // add clear-request
-        self.clear_response_queues.push(Callback::new(
-            |world: &mut World| { syscall(world, (), clear_response_queue::<E, Req, Resp>); }
-        ));
-
-        // add reset-response
-        self.reset_response_queues.push(Callback::new(
-            |world: &mut World| { syscall(world, (), reset_response_queue::<E, Req, Resp>); }
+        self.clear_request_queues.push(CallbackWith::new(
+            |world: &mut World, target: Option<SessionId>| { syscall(world, target, clear_request_queue::<E, Req, Resp>); }
         ));
 
         // add send-request
-        self.send_responses
+        self.send_requests
             .entry(response_event_id)
             .or_default()
             .insert(
                 request_event_id,
                 CallbackWith::new(
-                    |world: &mut World, response: PendingResponse|
-                    { syscall(world, response, send_response::<E, Req, Resp>); }
+                    |world: &mut World, package: (RequestToken, Vec<u8>)|
+                    { syscall(world, package, send_request::<E, Req, Resp>); }
                 )
             ).unwrap();
     }
@@ -187,71 +174,76 @@ impl<E: EventPack> EventQueueConnectorClient<E>
         // clear messages
         for cb in self.clear_message_queues.iter()
         {
-            cb.apply(world);
+            cb.call_with(None).apply(world);
         }
 
-        // clear responses
-        for cb in self.clear_response_queues.iter()
+        // clear requests
+        for cb in self.clear_request_queues.iter()
         {
-            cb.apply(world);
+            cb.call_with(None).apply(world);
         }
     }
 
-    pub(crate) fn handle_disconnect(&self, world: &mut World)
+    pub(crate) fn handle_disconnect(&self, world: &mut World, session_id: SessionId)
     {
         // clear messages
         for cb in self.clear_message_queues.iter()
         {
-            cb.apply(world);
+            cb.call_with(Some(session_id)).apply(world);
         }
 
-        // replace Response/Ack with ResponseLost
-        for cb in self.reset_response_queues.iter()
+        // clear requests
+        for cb in self.clear_request_queues.iter()
         {
-            cb.apply(world);
+            cb.call_with(Some(session_id)).apply(world);
         }
     }
 
-    pub(crate) fn send_connection(&self, world: &mut World, counter: u32, report: ClientReport)
-    {
-        syscall(world, (counter, report), send_connection::<E>);
+    pub(crate) fn send_connection(
+        &self,
+        world      : &mut World,
+        counter    : u32,
+        session_id : SessionId,
+        report     : ServerReport<E::ConnectMsg>
+    ){
+        syscall(world, (counter, session_id, report), send_connection::<E>);
     }
 
-    pub(crate) fn send_message(&self, world: &mut World, message_event_id: u16, data: Vec<u8>)
+    pub(crate) fn send_message(&self, world: &mut World, session_id: SessionId, message_event_id: u16, data: Vec<u8>)
     {
         let Some(cb) = self.send_messages.get(&message_event_id)
         else { tracing::error!("tried to send message of unregistered message type"); return; };
 
-        cb.call_with(data).apply(world);
+        cb.call_with((session_id, data)).apply(world);
     }
 
-    pub(crate) fn send_response(&self,
+    pub(crate) fn send_request(&self,
         world             : &mut World,
+        session_id        : SessionId,
         request_event_id  : u16,
         response_event_id : u16,
-        request_id        : u64,
-        data              : PendingResponseData,
+        request_token     : RequestToken,
+        data              : Vec<u8>,
     ){
-        let Some(request_map) = self.send_responses.get(&response_event_id)
-        else { tracing::error!("tried to send response of unregistered response type"); return; };
+        let Some(request_map) = self.send_requests.get(&response_event_id)
+        else { tracing::error!("tried to send request of unregistered response type"); return; };
 
         let Some(cb) = request_map.get(&request_event_id)
-        else { tracing::error!("tried to send response for unregistered request type"); return; };
+        else { tracing::error!("tried to send request for unregistered request type"); return; };
 
-        cb.call_with(PendingResponse{ request_id, data }).apply(world);
+        cb.call_with((request_token, data)).apply(world);
     }
 }
 
-impl<E: EventPack> Default for EventQueueConnectorClient<E>
+impl<E: EventPack> Default for EventQueueConnectorServer<E>
 {
     fn default() -> Self
     {
         Self{
             clear_message_queues: Vec::default(),
-            clear_response_queues: Vec::default(),
-            reset_response_queues: Vec::default(),
+            clear_request_queues: Vec::default(),
             send_messages: HashMap::default(),
-            send_responses: HashMap::default(),
+            send_requests: HashMap::default(),
             phantom: PhantomData::default(),
         }
     }

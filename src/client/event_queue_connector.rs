@@ -111,7 +111,7 @@ fn send_response<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-/// Exposes access to registered event queues.
+/// Provides access to registered event queues.
 #[derive(Resource)]
 pub(crate) struct EventQueueConnectorClient<E: EventPack>
 {

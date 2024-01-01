@@ -9,8 +9,6 @@ use bincode::Options;
 
 //standard shortcuts
 use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 //-------------------------------------------------------------------------------------------------------------------

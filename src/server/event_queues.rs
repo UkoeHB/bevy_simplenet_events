@@ -51,7 +51,7 @@ impl<E: EventPack> Default for ServerConnectionQueue<E>
 #[derive(Resource)]
 pub(crate) struct ServerMessageQueue<E: EventPack, T: SimplenetEvent>
 {
-    queue: Vec<(SessionId, T)>,
+    queue: Vec<Option<(SessionId, T)>>,
     phantom: PhantomData<E>,
 }
 
@@ -62,14 +62,25 @@ impl<E: EventPack, T: SimplenetEvent> ServerMessageQueue<E, T>
         self.queue.clear();
     }
 
+    pub(crate) fn clear_session(&mut self, session_id: SessionId)
+    {
+        self.queue
+            .iter_mut()
+            .filter_map(|i| i)
+            .filter(|i| i.0 == session_id)
+            .for_each(|i| { i = None; });
+    }
+
     pub(crate) fn send(&mut self, session_id: SessionId, message: T)
     {
-        self.queue.push((session_id, message));
+        self.queue.push(Some((session_id, message)));
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = &(SessionId, T)> + '_
     {
-        self.queue.iter()
+        self.queue
+            .iter()
+            .filter_map(|i| i)
     }
 }
 
@@ -83,7 +94,7 @@ impl<E: EventPack, T: SimplenetEvent> Default for ServerMessageQueue<E, T>
 #[derive(Resource)]
 pub(crate) struct ServerRequestQueue<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>
 {
-    queue: Vec<(SessionId, Req, RequestToken)>,
+    queue: Vec<Option<(RequestToken, Req)>>,
     phantom: PhantomData<(E, Resp)>,
 }
 
@@ -94,14 +105,23 @@ impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ServerRequestQueue
         self.queue.clear();
     }
 
-    pub(crate) fn send(&mut self, session_id: SessionId, request: Req, request_token: RequestToken)
+    pub(crate) fn clear_session(&mut self, session_id: SessionId)
     {
-        self.queue.push((session_id, request, request_token));
+        self.queue
+            .iter_mut()
+            .filter_map(|i| i)
+            .filter(|i| i.0.client_id() == session_id)
+            .for_each(|i| { i = None; });
     }
 
-    pub(crate) fn drain(&mut self) -> impl Iterator<Item = (SessionId, Req, RequestToken)> + '_
+    pub(crate) fn send(&mut self, request_token: RequestToken, request: Req)
     {
-        self.queue.drain(..)
+        self.queue.push(Some((request_token, request)));
+    }
+
+    pub(crate) fn drain(&mut self) -> impl Iterator<Item = (RequestToken, Req)> + '_
+    {
+        self.queue.drain(..).filter_map(|i| i)
     }
 }
 
