@@ -280,6 +280,14 @@ fn send_client_message<T: SimplenetEvent>(In(msg): In<T>, client: EventClient<De
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
+fn try_send_client_message<T: SimplenetEvent>(In(msg): In<T>, client: EventClient<DemoChannel>) -> bool
+{
+    client.send(msg).is_ok()
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
 fn send_client_request<Req: SimplenetEvent>(In(request): In<Req>, client: EventClient<DemoChannel>)
 {
     client.request(request).unwrap();
@@ -291,6 +299,17 @@ fn send_client_request<Req: SimplenetEvent>(In(request): In<Req>, client: EventC
 fn send_server_message<T: SimplenetEvent>(In((client_id, msg)): In<(SessionId, T)>, server: EventServer<DemoChannel>)
 {
     server.send(client_id, msg).unwrap();
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn try_send_server_message<T: SimplenetEvent>(
+    In((client_id, msg)) : In<(SessionId, T)>,
+    server               : EventServer<DemoChannel>
+) -> bool
+{
+    server.send(client_id, msg).is_ok()
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -788,9 +807,42 @@ fn client_loses_old_server_response()
 //-------------------------------------------------------------------------------------------------------------------
 
 // client: message send blocked by connect event
-//server sends message, disconnect client, waits for reconnect
-//client receives message 1, fails to send new message, receives disconnect, can't send new message, receives connect,
-//  can send
+#[test]
+fn client_send_blocked_until_read_connect()
+{
+    let mut server_app = App::new();
+    let mut client_app = App::new();
+
+    let url = setup_server(&mut server_app);
+    let client_id = 0u128;
+    setup_client(&mut client_app, url, client_id, DemoConnectMsg(String::default()));
+    setup_event_app(&mut server_app);
+    setup_event_app(&mut client_app);
+
+    server_app.update();
+    client_app.update();
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    assert!(!syscall(&mut client_app.world, DemoMsg1(1), try_send_client_message::<DemoMsg1>));
+
+    assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 1);
+    assert_eq!(syscall(&mut client_app.world, (), num_connection_events_client), 1);
+
+    assert!(syscall(&mut client_app.world, DemoMsg1(10), try_send_client_message::<DemoMsg1>));
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    assert_eq!(syscall(&mut server_app.world, (), num_message_events_server::<DemoMsg1>), 1);
+
+    assert!(syscall(&mut server_app.world, (client_id, DemoMsg1(10)), check_server_received_message::<DemoMsg1>));
+}
 
 //-------------------------------------------------------------------------------------------------------------------
 
