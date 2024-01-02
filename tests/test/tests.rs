@@ -859,8 +859,41 @@ fn client_send_blocked_until_read_connect()
 //-------------------------------------------------------------------------------------------------------------------
 
 // server: message send blocked by connect event
-//client sends message, server disconnects, waits for reconnect
-//server receives message 1, fails to send new message, receives disconnect, can't send new message, receives connect,
-//  can send
+#[test]
+fn server_send_blocked_until_read_connect()
+{
+    let mut server_app = App::new();
+    let mut client_app = App::new();
+
+    let url = setup_server(&mut server_app);
+    let client_id = 0u128;
+    setup_client(&mut client_app, url, client_id, DemoConnectMsg(String::default()));
+    setup_event_app(&mut server_app);
+    setup_event_app(&mut client_app);
+
+    server_app.update();
+    client_app.update();
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    assert!(!syscall(&mut server_app.world, (client_id, DemoMsg1(1)), try_send_server_message::<DemoMsg1>));
+
+    assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 1);
+    assert_eq!(syscall(&mut client_app.world, (), num_connection_events_client), 1);
+
+    assert!(syscall(&mut server_app.world, (client_id, DemoMsg1(10)), try_send_server_message::<DemoMsg1>));
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    assert_eq!(syscall(&mut client_app.world, (), num_message_events_client::<DemoMsg1>), 1);
+
+    assert!(syscall(&mut client_app.world, DemoMsg1(10), check_client_received_message::<DemoMsg1>));
+}
 
 //-------------------------------------------------------------------------------------------------------------------
