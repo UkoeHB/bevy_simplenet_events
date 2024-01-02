@@ -38,8 +38,8 @@ fn drain_client<E: EventPack>(world: &mut World)
             {
                 match &report
                 {
-                    ClientReport::Disconnected => queues.handle_disconnect(world),
-                    _                          => ()
+                    ClientReport::Connected => (),
+                    _                       => queues.handle_disconnect(world),  //all other variants are disconnect types
                 }
 
                 queues.send_connection(world, counter, report);

@@ -326,6 +326,14 @@ fn send_server_reject<Req: SimplenetEvent, Resp: SimplenetEvent>(
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
+fn disconnect_client_on_server(In(session_id): In<SessionId>, server: EventServer<DemoChannel>)
+{
+    server.close_session(session_id, None).unwrap();
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
 // client connection
 //client connects
 //server receives connection in multiple systems
@@ -654,8 +662,54 @@ fn client_server_shared_app()
 //-------------------------------------------------------------------------------------------------------------------
 
 // client: old server message dropped after disconnect
-//server sends message, disconnect client, waits for reconnect
-//client receives disconnect, receives nothing, receives connect, receives nothing
+#[test]
+fn client_drops_old_server_msg()
+{
+    // prepare tracing
+    /*
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(tracing::Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing::info!("ws hello world test: start");
+    */
+
+    let mut server_app = App::new();
+    let mut client_app = App::new();
+
+    let url = setup_server(&mut server_app);
+    let client_id = 0u128;
+    setup_client(&mut client_app, url, client_id, DemoConnectMsg(String::default()));
+
+    setup_event_app(&mut server_app);
+    setup_event_app(&mut client_app);
+
+    server_app.update();
+    client_app.update();
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 1);
+    assert_eq!(syscall(&mut client_app.world, (), num_connection_events_client), 1);
+
+    assert!(syscall(&mut server_app.world, client_id, check_client_connected_on_server));
+    assert!(syscall(&mut client_app.world, (), check_client_connected_on_client));
+
+    syscall(&mut server_app.world, (client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    syscall(&mut server_app.world, client_id, disconnect_client_on_server);
+
+    std::thread::sleep(std::time::Duration::from_millis(200));
+
+    server_app.update();
+    client_app.update();
+
+    assert_eq!(syscall(&mut client_app.world, (), num_connection_events_client), 2);
+    assert_eq!(syscall(&mut client_app.world, (), num_message_events_client::<DemoMsg1>), 0);
+}
 
 //-------------------------------------------------------------------------------------------------------------------
 

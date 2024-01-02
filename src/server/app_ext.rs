@@ -45,8 +45,8 @@ fn drain_server<E: EventPack>(world: &mut World)
             {
                 match &report
                 {
-                    ServerReport::<E::ConnectMsg>::Disconnected => queues.handle_disconnect(world, session_id),
-                    _                                           => (),
+                    ServerReport::<E::ConnectMsg>::Connected(..) => (),
+                    _                                            => queues.handle_disconnect(world, session_id),
                 }
 
                 queues.send_connection(world, counter, session_id, report);

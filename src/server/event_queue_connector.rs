@@ -180,6 +180,8 @@ impl<E: EventPack> EventQueueConnectorServer<E>
 
     pub(crate) fn handle_disconnect(&self, world: &mut World, session_id: SessionId)
     {
+        tracing::trace!(session_id, "clearing server queues on disconnect");
+
         // clear messages for this client
         for cb in self.clear_message_queues.iter()
         {

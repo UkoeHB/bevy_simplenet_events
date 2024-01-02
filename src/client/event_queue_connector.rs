@@ -201,6 +201,8 @@ impl<E: EventPack> EventQueueConnectorClient<E>
 
     pub(crate) fn handle_disconnect(&self, world: &mut World)
     {
+        tracing::debug!("clearing client queues on disconnect");
+
         // clear messages
         for cb in self.clear_message_queues.iter()
         {
