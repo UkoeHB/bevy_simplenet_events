@@ -295,40 +295,48 @@ fn client_connection()
 fn server_multisystem_reader()
 {
     let mut server_app = App::new();
-    let mut client_app = App::new();
+    let mut client_app1 = App::new();
+    let mut client_app2 = App::new();
 
     let url = setup_server(&mut server_app);
-    let client_id = 0u128;
-    setup_client(&mut client_app, url, client_id, DemoConnectMsg(String::default()));
+    let client_id1 = 0u128;
+    let client_id2 = 1u128;
+    setup_client(&mut client_app1, url.clone(), client_id1, DemoConnectMsg(String::default()));
+    setup_client(&mut client_app2, url, client_id2, DemoConnectMsg(String::default()));
 
     setup_event_app(&mut server_app);
-    setup_event_app(&mut client_app);
+    setup_event_app(&mut client_app1);
+    setup_event_app(&mut client_app2);
 
     server_app.update();
-    client_app.update();
+    client_app1.update();
+    client_app2.update();
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     server_app.update();
-    client_app.update();
+    client_app1.update();
+    client_app2.update();
 
     //note: must read connection events before sending is allowed
-    assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 1);
-    assert_eq!(syscall(&mut client_app.world, (), num_connection_events_client), 1);
+    assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 2);
+    assert_eq!(syscall(&mut client_app1.world, (), num_connection_events_client), 1);
+    assert_eq!(syscall(&mut client_app2.world, (), num_connection_events_client), 1);
 
-    syscall(&mut client_app.world, DemoMsg1(10), send_client_message::<DemoMsg1>);
-    syscall(&mut client_app.world, DemoMsg2(20), send_client_message::<DemoMsg2>);
+    syscall(&mut client_app1.world, DemoMsg1(10), send_client_message::<DemoMsg1>);
+    syscall(&mut client_app1.world, DemoMsg2(20), send_client_message::<DemoMsg2>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     server_app.update();
-    client_app.update();
+    client_app1.update();
+    client_app2.update();
 
     assert_eq!(syscall(&mut server_app.world, (), num_message_events_server::<DemoMsg1>), 1);
     assert_eq!(syscall(&mut server_app.world, (), num_message_events_server::<DemoMsg2>), 1);
 
-    assert!(syscall(&mut server_app.world, (client_id, DemoMsg1(10)), check_server_received_message::<DemoMsg1>));
-    assert!(syscall(&mut server_app.world, (client_id, DemoMsg2(20)), check_server_received_message::<DemoMsg2>));
+    assert!(syscall(&mut server_app.world, (client_id1, DemoMsg1(10)), check_server_received_message::<DemoMsg1>));
+    assert!(syscall(&mut server_app.world, (client_id1, DemoMsg2(20)), check_server_received_message::<DemoMsg2>));
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -336,6 +344,56 @@ fn server_multisystem_reader()
 // client: multi-system reader
 //server message
 //client receives in multiple systems
+#[test]
+fn client_multisystem_reader()
+{
+    let mut server_app = App::new();
+    let mut client_app1 = App::new();
+    let mut client_app2 = App::new();
+
+    let url = setup_server(&mut server_app);
+    let client_id1 = 0u128;
+    let client_id2 = 1u128;
+    setup_client(&mut client_app1, url.clone(), client_id1, DemoConnectMsg(String::default()));
+    setup_client(&mut client_app2, url, client_id2, DemoConnectMsg(String::default()));
+
+    setup_event_app(&mut server_app);
+    setup_event_app(&mut client_app1);
+    setup_event_app(&mut client_app2);
+
+    server_app.update();
+    client_app1.update();
+    client_app2.update();
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app1.update();
+    client_app2.update();
+
+    //note: must read connection events before sending is allowed
+    assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 2);
+    assert_eq!(syscall(&mut client_app1.world, (), num_connection_events_client), 1);
+    assert_eq!(syscall(&mut client_app2.world, (), num_connection_events_client), 1);
+
+    syscall(&mut server_app.world, (client_id1, DemoMsg1(10)), send_server_message::<DemoMsg1>);
+    syscall(&mut server_app.world, (client_id1, DemoMsg2(20)), send_server_message::<DemoMsg2>);
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app1.update();
+    client_app2.update();
+
+    assert_eq!(syscall(&mut client_app1.world, (), num_message_events_client::<DemoMsg1>), 1);
+    assert_eq!(syscall(&mut client_app1.world, (), num_message_events_client::<DemoMsg2>), 1);
+    assert_eq!(syscall(&mut client_app2.world, (), num_message_events_client::<DemoMsg1>), 0);
+    assert_eq!(syscall(&mut client_app2.world, (), num_message_events_client::<DemoMsg2>), 0);
+
+    assert!(syscall(&mut client_app1.world, DemoMsg1(10), check_client_received_message::<DemoMsg1>));
+    assert!(syscall(&mut client_app1.world, DemoMsg2(20), check_client_received_message::<DemoMsg2>));
+}
+
 
 //-------------------------------------------------------------------------------------------------------------------
 
