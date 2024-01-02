@@ -198,7 +198,7 @@ fn check_client_received_message<T: SimplenetEvent + Eq + PartialEq>(
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn get_server_request<Req: SimplenetEvent + Eq + PartialEq, Resp: SimplenetEvent + Eq + PartialEq>(
+fn get_server_requests<Req: SimplenetEvent + Eq + PartialEq, Resp: SimplenetEvent + Eq + PartialEq>(
     In(client_id) : In<SessionId>,
     mut reader    : ServerRequestSource<DemoChannel, Req, Resp>
 ) -> Vec<(RequestToken, Req)>
@@ -522,7 +522,7 @@ fn client_request()
     server_app.update();
     client_app.update();
 
-    let mut reqs = syscall(&mut server_app.world, client_id, get_server_request::<DemoRequest1, DemoResponse1>);
+    let mut reqs = syscall(&mut server_app.world, client_id, get_server_requests::<DemoRequest1, DemoResponse1>);
     let (token, req) = reqs.pop().unwrap();
     let request_id = token.request_id();
     assert_eq!(req, DemoRequest1(1));
@@ -594,7 +594,7 @@ fn client_request_acked_rejected()
     server_app.update();
     client_app.update();
 
-    let mut requests = syscall(&mut server_app.world, client_id, get_server_request::<DemoRequest2, ()>);
+    let mut requests = syscall(&mut server_app.world, client_id, get_server_requests::<DemoRequest2, ()>);
     let (token1, req1) = requests.pop().unwrap();
     let (token2, req2) = requests.pop().unwrap();
     let request_id1 = token1.request_id();
@@ -714,8 +714,76 @@ fn client_drops_old_server_msg()
 //-------------------------------------------------------------------------------------------------------------------
 
 // client: old server response of type 'response' or 'ack' replaced with 'response lost' after disconnect
-//client sends request, server sends response, disconnect client, waits for reconnect
-//client receives disconnect, receives response lost
+#[test]
+fn client_loses_old_server_response()
+{
+    // prepare tracing
+    /*
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(tracing::Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing::info!("ws hello world test: start");
+    */
+
+    let mut server_app = App::new();
+    let mut client_app = App::new();
+
+    let url = setup_server(&mut server_app);
+    let client_id = 0u128;
+    setup_client(&mut client_app, url, client_id, DemoConnectMsg(String::default()));
+
+    setup_event_app(&mut server_app);
+    setup_event_app(&mut client_app);
+
+    server_app.update();
+    client_app.update();
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 1);
+    assert_eq!(syscall(&mut client_app.world, (), num_connection_events_client), 1);
+
+    syscall(&mut client_app.world, DemoRequest1(1), send_client_request::<DemoRequest1>);
+    syscall(&mut client_app.world, DemoRequest1(2), send_client_request::<DemoRequest1>);
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+
+    let mut requests = syscall(&mut server_app.world, client_id, get_server_requests::<DemoRequest1, DemoResponse1>);
+    let (token1, _req1) = requests.pop().unwrap();
+    let (token2, _req2) = requests.pop().unwrap();
+    let request_id1 = token1.request_id();
+    let request_id2 = token2.request_id();
+
+    syscall(&mut server_app.world, (token1, DemoResponse1(1)), send_server_response::<DemoRequest1, DemoResponse1>);
+    syscall(&mut server_app.world, token2, send_server_ack::<DemoRequest1, DemoResponse1>);
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    syscall(&mut server_app.world, client_id, disconnect_client_on_server);
+
+    std::thread::sleep(std::time::Duration::from_millis(200));
+
+    server_app.update();
+    client_app.update();
+
+    assert_eq!(syscall(&mut client_app.world, (), num_connection_events_client), 2);
+    assert_eq!(syscall(&mut client_app.world, (), num_response_events_client::<DemoRequest1, DemoResponse1>), 2);
+
+    assert!(syscall(
+            &mut client_app.world,
+            ServerResponse::ResponseLost(request_id1),
+            check_client_received_response::<DemoRequest1, DemoResponse1>
+        ));
+    assert!(syscall(
+            &mut client_app.world,
+            ServerResponse::ResponseLost(request_id2),
+            check_client_received_response::<DemoRequest1, DemoResponse1>
+        ));
+}
 
 //-------------------------------------------------------------------------------------------------------------------
 
