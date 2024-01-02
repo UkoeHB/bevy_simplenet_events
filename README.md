@@ -43,28 +43,238 @@ This crate is less efficient than `bevy_simplenet`.
 
 **Shared**
 
+Prepare message types and the channel tag that implements [`EventPack`](bevy_simplenet_events::EventPack).
+
+```rust
+#[derive(SimplenetEvent, Serialize, Deserialize)]
+struct DemoMsg1(usize);
+
+#[derive(SimplenetEvent, Serialize, Deserialize)]
+struct DemoMsg2(usize);
+
+#[derive(SimplenetEvent, Serialize, Deserialize)]
+struct DemoRequest(usize);
+
+#[derive(SimplenetEvent, Serialize, Deserialize)]
+struct DemoResponse(usize);
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+struct DemoConnectMsg(String);
+
+#[derive(Debug, Clone)]
+struct DemoChannel;
+impl EventPack for DemoChannel
+{
+    type ConnectMsg = DemoConnectMsg;
+}
+```
+
+Prepare event setup function. This should be called on both the server and client apps.
+
+```rust
+fn event_setup(app: &mut App)
+{
+    app
+        .register_simplenet_client_message::<DemoChannel, DemoMsg1>()
+        .register_simplenet_client_message::<DemoChannel, DemoMsg2>()
+
+        .register_simplenet_server_message::<DemoChannel, DemoMsg1>()
+        .register_simplenet_server_message::<DemoChannel, DemoMsg2>()
+
+        .register_simplenet_request_response::<DemoChannel, DemoRequest, DemoResponse>()
+        ;
+}
+```
 
 **Server**
 
+Prepare server factory.
+
+```rust
+type DemoServerReport = bevy_simplenet::ServerReport<DemoConnectMsg>;
+
+fn demo_server_factory() -> bevy_simplenet::ServerFactory<EventWrapper<DemoChannel>>
+{
+    bevy_simplenet::ServerFactory::<EventWrapper<DemoChannel>>::new("test")
+}
+```
+
+Prepare server setup function (example).
+
+```rust
+fn setup_server(app: &mut App) -> url::Url
+{
+    let websocket_server = demo_server_factory().new_server(
+            enfync::builtin::native::TokioHandle::adopt_or_default(),
+            "127.0.0.1:0",
+            bevy_simplenet::AcceptorConfig::Default,
+            bevy_simplenet::Authenticator::None,
+            bevy_simplenet::ServerConfig::default(),
+        );
+    let url = websocket_server.url();
+
+    app.insert_simplenet_server(websocket_server);
+    event_setup(app);
+
+    url
+}
+```
 
 **Client**
+
+Prepare client factory.
+
+```rust
+fn demo_client_factory() -> bevy_simplenet::ClientFactory<EventWrapper<DemoChannel>>
+{
+    bevy_simplenet::ClientFactory::<EventWrapper<DemoChannel>>::new("test")
+}
+```
+
+Prepare client setup function (example).
+
+```rust
+fn setup_client(app: &mut App, url: url::Url, client_id: SessionId, connect_msg: DemoConnectMsg)
+{
+    let websocket_client = demo_client_factory().new_client(
+            enfync::builtin::Handle::adopt_or_default(),
+            url,
+            bevy_simplenet::AuthRequest::None{ client_id },
+            bevy_simplenet::ClientConfig::default(),
+            connect_msg
+        );
+
+    app.insert_simplenet_client(websocket_client);
+    event_setup(app);
+}
+```
 
 
 ### Handling connections in the client
 
+Client connection reports must be handled before all other client events each tick.
+
+```rust
+fn handle_client_connection_reports(reader: ClientConnectionReader<DemoChannel>)
+{
+    for connection in reader.iter()
+    {
+        match connection
+        {
+            bevy_simplenet::ClientReport::Connected         => todo!(),
+            bevy_simplenet::ClientReport::Disconnected      => todo!(),
+            bevy_simplenet::ClientReport::ClosedByServer(_) => todo!(),
+            bevy_simplenet::ClientReport::ClosedBySelf      => todo!(),
+            bevy_simplenet::ClientReport::IsDead(_)         => todo!(),
+        }
+    }
+}
+```
+
 
 ### Handling connections in the server
+
+Server connection reports must be handled before all other server events each tick.
+
+```rust
+fn handle_server_connection_reports(reader: ServerConnectionReader<DemoChannel>)
+{
+    for (session_id, connection) in reader.iter()
+    {
+        match connection
+        {
+            bevy_simplenet::ServerReport::<DemoConnectMsg>::Connected(_, _) => todo!(),
+            bevy_simplenet::ServerReport::<DemoConnectMsg>::Disconnected    => todo!(),
+        }
+    }
+}
+```
 
 
 ### Sending from the client
 
+Any registered message type can be sent.
 
-### Reading from the server
+```rust
+fn send_client_message(client: EventClient<DemoChannel>)
+{
+    client.send(DemoMsg1(42)).unwrap();
+    client.send(DemoMsg2(24)).unwrap();
+}
+```
 
 
 ### Sending from the server
 
+Any registered message type can be sent.
 
-### Reading from the client
+```rust
+fn send_server_message(In(session_id): In<SessionId>, server: EventServer<DemoChannel>)
+{
+    server.send(session_id, DemoMsg1(42)).unwrap();
+    server.send(session_id, DemoMsg2(24)).unwrap();
+}
+```
 
 
+### Reading on the server
+
+**Client messages**
+
+```rust
+fn read_client_messages(reader: ServerMessageReader<DemoChannel, DemoMsg1>)
+{
+    for (session_id, message) in reader.iter()
+    {
+        todo!()
+    }
+}
+```
+
+**Client requests**
+
+Draining a request source consumes all requests, since we expect you to do something with the request token.
+
+```rust
+fn read_client_requests(source: ServerRequestSource<DemoChannel, DemoRequest1, DemoResponse1>)
+{
+    for (session_id, request) in source.drain()
+    {
+        todo!()
+    }
+}
+```
+
+
+### Reading on the client
+
+**Server messages**
+
+```rust
+fn read_server_messages(reader: ClientMessageReader<DemoChannel, DemoMsg1>)
+{
+    for message in reader.iter()
+    {
+        todo!()
+    }
+}
+```
+
+**Server responses**
+
+```rust
+fn read_server_responses(reader: ClientResponseReader<DemoChannel, DemoRequest1, DemoResponse1>)
+{
+    for response in reader.iter()
+    {
+        match response
+        {
+            ServerResponse::Response(response, _) => todo!(),
+            ServerResponse::Ack(_)                => todo!(),
+            ServerResponse::Reject(_)             => todo!(),
+            ServerResponse::SendFailed(_)         => todo!(),
+            ServerResponse::ResponseLost(_)       => todo!(),
+        }
+    }
+}
+```

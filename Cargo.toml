@@ -16,6 +16,7 @@ members = [
 
 [lib]
 path = "src/lib.rs"
+doctest = false
 test = false
 
 [[test]]
