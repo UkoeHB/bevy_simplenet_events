@@ -1,7 +1,7 @@
 [package]
 name = "bevy_simplenet_events_derive"
 description = "Derives for bevy_simplenet events"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
