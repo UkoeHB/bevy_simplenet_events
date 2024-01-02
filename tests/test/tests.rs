@@ -514,7 +514,8 @@ fn client_request()
     server_app.update();
     client_app.update();
 
-    let (token, req) = syscall(&mut server_app.world, client_id, get_server_request::<DemoRequest1, DemoResponse1>).pop().unwrap();
+    let mut reqs = syscall(&mut server_app.world, client_id, get_server_request::<DemoRequest1, DemoResponse1>);
+    let (token, req) = reqs.pop().unwrap();
     let request_id = token.request_id();
     assert_eq!(req, DemoRequest1(1));
 
@@ -616,23 +617,49 @@ fn client_request_acked_rejected()
 //-------------------------------------------------------------------------------------------------------------------
 
 // client and server in same app
+#[test]
+fn client_server_shared_app()
+{
+    let mut shared_app = App::new();
+
+    let url = setup_server(&mut shared_app);
+    let client_id = 0u128;
+    setup_client(&mut shared_app, url, client_id, DemoConnectMsg(String::default()));
+
+    setup_event_app(&mut shared_app);
+
+    shared_app.update();
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    shared_app.update();
+
+    assert_eq!(syscall(&mut shared_app.world, (), num_connection_events_server), 1);
+    assert_eq!(syscall(&mut shared_app.world, (), num_connection_events_client), 1);
+
+    assert!(syscall(&mut shared_app.world, client_id, check_client_connected_on_server));
+    assert!(syscall(&mut shared_app.world, (), check_client_connected_on_client));
+
+    syscall(&mut shared_app.world, (client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
+    syscall(&mut shared_app.world, DemoMsg1(11), send_client_message::<DemoMsg1>);
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    shared_app.update();
+
+    assert!(syscall(&mut shared_app.world, (client_id, DemoMsg1(11)), check_server_received_message::<DemoMsg1>));
+    assert!(syscall(&mut shared_app.world, DemoMsg1(1), check_client_received_message::<DemoMsg1>));
+}
 
 //-------------------------------------------------------------------------------------------------------------------
 
-// client: new server message blocked by connect event
-//server sends message, disconnects client, waits for reconnect, sends new message
-//client receives message 1, does not receive message 2, receives disconnect, does not receive message 2, receives connect,
-//  receives message 2
-
-//-------------------------------------------------------------------------------------------------------------------
-
-// client: old server message dropped after disconnect consumed
+// client: old server message dropped after disconnect
 //server sends message, disconnect client, waits for reconnect
 //client receives disconnect, receives nothing, receives connect, receives nothing
 
 //-------------------------------------------------------------------------------------------------------------------
 
-// client: old server response of type 'response' or 'acl' replaced with 'response lost' after disconnect consumed
+// client: old server response of type 'response' or 'ack' replaced with 'response lost' after disconnect
 //client sends request, server sends response, disconnect client, waits for reconnect
 //client receives disconnect, receives response lost
 
@@ -645,20 +672,13 @@ fn client_request_acked_rejected()
 
 //-------------------------------------------------------------------------------------------------------------------
 
-// server: new client message blocked by connect event
-//client sends message, server disconnects, waits for reconnect, sends new message
-//server receives message 1, does not receive message 2, receives disconnect, does not receive message 2, receives connect,
-//  receives message 2
-
-//-------------------------------------------------------------------------------------------------------------------
-
-// server: old client message dropped after disconnect consumed
+// server: old client message dropped after disconnect
 //client sends message, server disconnects, waits for reconnect
 //server receives disconnect, receives nothing, receives connect, receives nothing
 
 //-------------------------------------------------------------------------------------------------------------------
 
-// server: old client request dropped after disconnect consumed
+// server: old client request dropped after disconnect
 //client sends request, server disconnects, waits for reconnect
 //server receives disconnect, receives nothing, receives connect, receives nothing
 
