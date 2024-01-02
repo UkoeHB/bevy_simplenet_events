@@ -15,19 +15,19 @@ use serde::{Serialize, Deserialize};
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct DemoMsg1(usize);
 
-#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct DemoMsg2(usize);
 
-#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct DemoRequest1(usize);
 
-#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct DemoRequest2(usize);
 
-#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct DemoResponse1(usize);
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -201,15 +201,16 @@ fn check_client_received_message<T: SimplenetEvent + Eq + PartialEq>(
 fn get_server_request<Req: SimplenetEvent + Eq + PartialEq, Resp: SimplenetEvent + Eq + PartialEq>(
     In(client_id) : In<SessionId>,
     mut reader    : ServerRequestSource<DemoChannel, Req, Resp>
-) -> Option<(RequestToken, Req)>
+) -> Vec<(RequestToken, Req)>
 {
-    for (token, client_request) in reader.drain()
-    {
-        if token.client_id() != client_id { continue; }
-        return Some((token, client_request));
-    }
-
-    None
+    reader.drain()
+        .filter(
+            |(token, _)|
+            {
+                token.client_id() == client_id
+            }
+        )
+        .collect()
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -436,7 +437,7 @@ fn client_multisystem_reader()
     client_app1.update();
     client_app2.update();
 
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    std::thread::sleep(std::time::Duration::from_millis(75));
 
     server_app.update();
     client_app1.update();
@@ -513,7 +514,7 @@ fn client_request()
     server_app.update();
     client_app.update();
 
-    let (token, req) = syscall(&mut server_app.world, client_id, get_server_request::<DemoRequest1, DemoResponse1>).unwrap();
+    let (token, req) = syscall(&mut server_app.world, client_id, get_server_request::<DemoRequest1, DemoResponse1>).pop().unwrap();
     let request_id = token.request_id();
     assert_eq!(req, DemoRequest1(1));
 
@@ -542,6 +543,75 @@ fn client_request()
 //client request
 //server receives and acks/rejects
 //client receives
+#[test]
+fn client_request_acked_rejected()
+{
+    // prepare tracing
+    /*
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(tracing::Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing::info!("ws hello world test: start");
+    */
+
+    let mut server_app = App::new();
+    let mut client_app = App::new();
+
+    let url = setup_server(&mut server_app);
+    let client_id = 0u128;
+    setup_client(&mut client_app, url, client_id, DemoConnectMsg(String::default()));
+
+    setup_event_app(&mut server_app);
+    setup_event_app(&mut client_app);
+
+    server_app.update();
+    client_app.update();
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    //note: must read connection events before sending is allowed
+    assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 1);
+    assert_eq!(syscall(&mut client_app.world, (), num_connection_events_client), 1);
+
+    syscall(&mut client_app.world, DemoRequest2(2), send_client_request::<DemoRequest2>);
+    syscall(&mut client_app.world, DemoRequest2(22), send_client_request::<DemoRequest2>);
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    let mut requests = syscall(&mut server_app.world, client_id, get_server_request::<DemoRequest2, ()>);
+    let (token1, req1) = requests.pop().unwrap();
+    let (token2, req2) = requests.pop().unwrap();
+    let request_id1 = token1.request_id();
+    let request_id2 = token2.request_id();
+    let mut reqs = [req1, req2]; reqs.sort();
+    assert_eq!(reqs, [DemoRequest2(2), DemoRequest2(22)]);
+
+    syscall(&mut server_app.world, token1, send_server_ack::<DemoRequest2, ()>);
+    syscall(&mut server_app.world, token2, send_server_reject::<DemoRequest2, ()>);
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    assert!(syscall(
+            &mut client_app.world,
+            ServerResponse::Ack(request_id1),
+            check_client_received_response::<DemoRequest2, ()>
+        ));
+    assert!(syscall(
+            &mut client_app.world,
+            ServerResponse::Reject(request_id2),
+            check_client_received_response::<DemoRequest2, ()>
+        ));
+}
 
 //-------------------------------------------------------------------------------------------------------------------
 
