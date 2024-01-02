@@ -44,7 +44,7 @@ impl<'w, E: EventPack> EventClient<'w, E>
     /// All messages and requests submitted after this is called will fail to send.
     pub fn close(&self)
     {
-        self.client.close()
+        self.client.close();
     }
 }
 

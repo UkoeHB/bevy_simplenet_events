@@ -353,6 +353,14 @@ fn disconnect_client_on_server(In(session_id): In<SessionId>, server: EventServe
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
+fn disconnect_client_on_client(client: EventClient<DemoChannel>)
+{
+    client.close();
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
 // client connection
 //client connects
 //server receives connection in multiple systems
@@ -846,15 +854,54 @@ fn client_send_blocked_until_read_connect()
 
 //-------------------------------------------------------------------------------------------------------------------
 
-// server: old client message dropped after disconnect
-//client sends message, server disconnects, waits for reconnect
-//server receives disconnect, receives nothing, receives connect, receives nothing
+// server: old client message/request dropped after disconnect
+#[test]
+fn server_drops_old_client_msg()
+{
+    // prepare tracing
+    /*
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(tracing::Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing::info!("ws hello world test: start");
+    */
 
-//-------------------------------------------------------------------------------------------------------------------
+    let mut server_app = App::new();
+    let mut client_app = App::new();
 
-// server: old client request dropped after disconnect
-//client sends request, server disconnects, waits for reconnect
-//server receives disconnect, receives nothing, receives connect, receives nothing
+    let url = setup_server(&mut server_app);
+    let client_id = 0u128;
+    setup_client(&mut client_app, url, client_id, DemoConnectMsg(String::default()));
+
+    setup_event_app(&mut server_app);
+    setup_event_app(&mut client_app);
+
+    server_app.update();
+    client_app.update();
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 1);
+    assert_eq!(syscall(&mut client_app.world, (), num_connection_events_client), 1);
+
+    syscall(&mut client_app.world, DemoMsg1(1), send_client_message::<DemoMsg1>);
+    syscall(&mut client_app.world, DemoRequest1(11), send_client_request::<DemoRequest1>);
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    syscall(&mut client_app.world, (), disconnect_client_on_client);
+
+    std::thread::sleep(std::time::Duration::from_millis(200));
+
+    server_app.update();
+    client_app.update();
+
+    assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 1);
+    assert_eq!(syscall(&mut server_app.world, (), num_message_events_server::<DemoMsg1>), 0);
+    assert_eq!(syscall(&mut server_app.world, (), num_request_events_server::<DemoRequest1, DemoResponse1>), 0);
+}
 
 //-------------------------------------------------------------------------------------------------------------------
 
