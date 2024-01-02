@@ -30,7 +30,6 @@ fn drain_client<E: EventPack>(world: &mut World)
     queues.clear_all(world);
 
     // drain events
-    let mut pending_connect: Option<u32> = None;
     while let Some((counter, event)) = client.next()
     {
         match event

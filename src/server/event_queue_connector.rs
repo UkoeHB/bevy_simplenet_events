@@ -5,7 +5,7 @@ use crate::*;
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::Command;
 use bevy_kot_ecs::*;
-use bevy_simplenet::ClientReport;
+use bevy_simplenet::{ClientReport, RequestToken, ServerReport, SessionId};
 use bincode::Options;
 
 //standard shortcuts
@@ -211,7 +211,6 @@ impl<E: EventPack> EventQueueConnectorServer<E>
 
     pub(crate) fn send_request(&self,
         world             : &mut World,
-        session_id        : SessionId,
         request_event_id  : u16,
         response_event_id : u16,
         request_token     : RequestToken,

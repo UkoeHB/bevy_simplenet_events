@@ -7,10 +7,10 @@ This crate requires nightly rust.
 
 ### Usage notes
 
-- Events must be registered in the same order on the server and client.
 - Client connection events, client/server message events, and server responses can be iterated with event readers in multiple systems. Client requests can be drained with [`ServerRequestSource`] in one system.
 - An event 'channel' of a single type is FIFO, however different event channels will not be synchronized with each other. This crate is not well-suited for users who want global FIFO ordering for all client/server outputs (use [`bevy_simplenet`](https://github.com/UkoeHB/bevy_simplenet) directly instead).
 - We assume the user's connection-event handlers are scheduled **after** [`RefreshSet`](bevy_simplenet_events::RefreshSet) in schedule `First` and **before** other event handlers.
+- Events must be registered in the same order on the server and client.
 
 
 ### Synchronization guarantees

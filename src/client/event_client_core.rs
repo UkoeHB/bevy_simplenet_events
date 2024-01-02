@@ -72,8 +72,13 @@ impl<E: EventPack> EventClientCore<E>
     }
 
     /// Clears the pending connect counter if the input counter equals it.
+    ///
+    /// Does nothing if the client is not connected.
     pub(crate) fn try_clear_pending_connect(&self, counter: u32)
     {
+        // RACE CONDITION SAFETY: This conditional races with setting the new value. We expect that new counters will
+        // only be set once per tick in a system with full access to this struct, so this method can only race with
+        // itself which is harmless.
         if Some(counter) == self.pending_connect()
         {
             self.set_pending_connect(None);
@@ -107,7 +112,7 @@ impl<E: EventPack> EventClientCore<E>
         else { tracing::error!("no response type registered for the given client request type"); return Err(()); };
 
         let Ok(data) = bincode::DefaultOptions::new().serialize(&request)
-        else { tracing::error!("failed serializing client message"); return Err(()); };
+        else { tracing::error!("failed serializing client request"); return Err(()); };
 
         let result = self.inner.request(InternalEvent{ id: request_event_id, data });
 
@@ -141,15 +146,18 @@ impl<E: EventPack> EventClientCore<E>
         self.inner.close();
     }
 
-    /// Extracts the next client message.
+    /// Extracts the next client event.
     pub(crate) fn next(&mut self) -> Option<(u32, ClientEventFrom<EventWrapper<E>>)>
     {
         let Some(next) = self.inner.next() else { return None; };
         self.counter += 1;
 
-        match *next
+        match &next
         {
-            ClientEventFrom::<EventWrapper<E>>::Report(ClientReport::Connected) => self.set_pending_connect(Some(counter)),
+            ClientEventFrom::<EventWrapper<E>>::Report(ClientReport::Connected) =>
+            {
+                self.set_pending_connect(Some(self.counter));
+            }
             _ => ()
         }
 

@@ -41,7 +41,7 @@ impl<E: EventPack> EventRegistry<E>
         let id = self.id_counter;
 
         self.message_map.insert(type_id, id).unwrap();
-        self.message_ids.insert(id).unwrap();
+        self.message_ids.insert(id);
 
         id
     }
@@ -64,7 +64,7 @@ impl<E: EventPack> EventRegistry<E>
         (req_id, resp_id)
     }
 
-    pub(crate) fn get_message_id<T>(&self) -> Option<u16>
+    pub(crate) fn get_message_id<T: SimplenetEvent>(&self) -> Option<u16>
     {
         self.message_map.get(&std::any::TypeId::of::<T>()).map(|i| *i)
     }
@@ -74,17 +74,17 @@ impl<E: EventPack> EventRegistry<E>
         self.message_ids.contains(&id)
     }
 
-    pub(crate) fn get_request_id<Req>(&self) -> Option<u16>
+    pub(crate) fn get_request_id<Req: SimplenetEvent>(&self) -> Option<u16>
     {
         self.request_map.get(&std::any::TypeId::of::<Req>()).map(|i| *i)
     }
 
-    pub(crate) fn get_response_id<Req>(&self) -> Option<u16>
+    pub(crate) fn get_response_id<Resp: SimplenetEvent>(&self) -> Option<u16>
     {
-        self.response_map.get(&std::any::TypeId::of::<Req>()).map(|i| *i)
+        self.response_map.get(&std::any::TypeId::of::<Resp>()).map(|i| *i)
     }
 
-    pub(crate) fn get_response_id_from_request<Req>(&self) -> Option<u16>
+    pub(crate) fn get_response_id_from_request<Req: SimplenetEvent>(&self) -> Option<u16>
     {
         self.request_response_map
             .get(&std::any::TypeId::of::<Req>())
@@ -98,7 +98,7 @@ impl<E: EventPack> EventRegistry<E>
 
     pub(crate) fn get_response_id_from_request_id(&self, request_event_id: u16) -> Option<u16>
     {
-        self.request_response_ids.get(&request_event_id)
+        self.request_response_ids.get(&request_event_id).copied()
     }
 }
 
@@ -109,6 +109,7 @@ impl<E: EventPack> Default for EventRegistry<E>
         Self{
             id_counter           : 0u16,
             message_map          : HashMap::default(),
+            message_ids          : HashSet::default(),
             request_map          : HashMap::default(),
             response_map         : HashMap::default(),
             request_response_map : HashMap::default(),

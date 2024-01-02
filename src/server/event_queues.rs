@@ -3,7 +3,7 @@ use crate::*;
 
 //third-party shortcuts
 use bevy_ecs::prelude::*;
-use bevy_simplenet::{RequestToken, ServerReport};
+use bevy_simplenet::{ClientReport, RequestToken, ServerReport, SessionId};
 use bincode::Options;
 
 //standard shortcuts
@@ -76,7 +76,7 @@ impl<E: EventPack, T: SimplenetEvent> ServerMessageQueue<E, T>
                     }
                 }
             )
-            .for_each(|i| { i = None; });
+            .for_each(|i| { *i = None; });
     }
 
     pub(crate) fn send(&mut self, session_id: SessionId, message: T)
@@ -88,7 +88,7 @@ impl<E: EventPack, T: SimplenetEvent> ServerMessageQueue<E, T>
     {
         self.queue
             .iter()
-            .filter_map(|i| i)
+            .filter_map(|i| i.as_ref())
     }
 }
 
@@ -127,7 +127,7 @@ impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ServerRequestQueue
                     }
                 }
             )
-            .for_each(|i| { i = None; });
+            .for_each(|i| { *i = None; });
     }
 
     pub(crate) fn send(&mut self, request_token: RequestToken, request: Req)

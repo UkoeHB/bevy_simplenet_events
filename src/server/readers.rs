@@ -4,7 +4,7 @@ use crate::*;
 //third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
-use bevy_simplenet::ClientReport;
+use bevy_simplenet::{ClientReport, RequestToken, ServerReport, SessionId};
 
 //standard shortcuts
 use std::fmt::Debug;

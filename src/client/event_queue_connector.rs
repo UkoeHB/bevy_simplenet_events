@@ -187,13 +187,13 @@ impl<E: EventPack> EventQueueConnectorClient<E>
         // clear messages
         for cb in self.clear_message_queues.iter()
         {
-            cb.apply(world);
+            cb.clone().apply(world);
         }
 
         // clear responses
         for cb in self.clear_response_queues.iter()
         {
-            cb.apply(world);
+            cb.clone().apply(world);
         }
     }
 
@@ -202,13 +202,13 @@ impl<E: EventPack> EventQueueConnectorClient<E>
         // clear messages
         for cb in self.clear_message_queues.iter()
         {
-            cb.apply(world);
+            cb.clone().apply(world);
         }
 
         // replace Response/Ack with ResponseLost
         for cb in self.reset_response_queues.iter()
         {
-            cb.apply(world);
+            cb.clone().apply(world);
         }
     }
 

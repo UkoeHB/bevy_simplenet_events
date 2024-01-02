@@ -54,16 +54,16 @@ fn drain_server<E: EventPack>(world: &mut World)
             InnerServerEvent::Msg(message) =>
             {
                 if !registry.has_message_id(message.id)
-                { tracing::trace!(request.id, "ignoring message with unknown event id"); continue; }
+                { tracing::trace!("ignoring message with unknown event id"); continue; }
 
                 queues.send_message(world, session_id, message.id, message.data);
             }
-            InnerServerEvent::Request(request, request_token) =>
+            InnerServerEvent::Request(request_token, request) =>
             {
                 let Some(response_event_id) = registry.get_response_id_from_request_id(request.id)
                 else { tracing::trace!(request.id, "ignoring request with unknown event id"); continue; };
 
-                queues.send_request(world, session_id, request.id, response_event_id, request_token, request.data);
+                queues.send_request(world, request.id, response_event_id, request_token, request.data);
             }
         }
     }

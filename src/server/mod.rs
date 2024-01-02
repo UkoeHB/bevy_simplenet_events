@@ -1,17 +1,15 @@
 //module tree
 mod app_ext;
-mod event_client;
-mod event_client_core;
 mod event_queue_connector;
 mod event_queues;
+mod event_server;
+mod event_server_core;
 mod readers;
-mod server_response;
 
 //API exports
-pub use crate::client::app_ext::*;
-pub use crate::client::event_client::*;
-pub use crate::client::event_client_core::*;
-pub use crate::client::event_queue_connector::*;
-pub use crate::client::event_queues::*;
-pub use crate::client::readers::*;
-pub use crate::client::server_response::*;
+pub use crate::server::app_ext::*;
+pub use crate::server::event_queue_connector::*;
+pub use crate::server::event_queues::*;
+pub use crate::server::event_server::*;
+pub use crate::server::event_server_core::*;
+pub use crate::server::readers::*;

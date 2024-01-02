@@ -153,7 +153,7 @@ impl SimplenetEventAppExt for App
 
             // register event
             self.world.resource_mut::<EventQueueConnectorServer<E>>().register_message::<T>(message_event_id);
-            self.init_resource::<ServerMessageQueue<T>>();
+            self.init_resource::<ServerMessageQueue<E, T>>();
         }
 
         self
@@ -176,8 +176,8 @@ impl SimplenetEventAppExt for App
         {
             self.world
                 .resource_mut::<EventQueueConnectorServer<E>>()
-                .register_request::<E, Req, Resp>(request_event_id, response_event_id);
-            self.init_resource::<ServerRequestQueue<Req, Resp>>();
+                .register_request::<Req, Resp>(request_event_id, response_event_id);
+            self.init_resource::<ServerRequestQueue<E, Req, Resp>>();
         }
 
         #[cfg(feature = "client")]

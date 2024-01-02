@@ -4,7 +4,7 @@ use crate::*;
 //third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
-use bevy_simplenet::{CloseFrame, MessageSignal, RequestSignal};
+use bevy_simplenet::{CloseFrame, MessageSignal, RequestToken, SessionId};
 use bincode::Options;
 
 //standard shortcuts
@@ -40,19 +40,19 @@ impl<'w, E: EventPack> EventServer<'w, E>
     /// Acknowledges a client request.
     pub fn ack(&self, token: RequestToken) -> Result<(), ()>
     {
-        self.server.ack(&self.registry, token)
+        self.server.ack(token)
     }
 
     /// Rejects a client request.
-    pub fn reject(&self, token: RequestToken) -> Result<(), ()>
+    pub fn reject(&self, token: RequestToken)
     {
-        self.server.reject(&self.registry, token)
+        self.server.reject(token)
     }
 
     /// Closes a client.
     ///
     /// All messages and requests submitted to the client after this is called will fail to send.
-    pub fn close_session(&self, session_id: SessionId, close_frame: Option<CloseFrame>)
+    pub fn close_session(&self, session_id: SessionId, close_frame: Option<CloseFrame>) -> Result<(), ()>
     {
         self.server.close_session(session_id, close_frame)
     }
