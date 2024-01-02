@@ -54,7 +54,7 @@ impl<E: EventPack> EventRegistry<E>
         let resp_id = self.id_counter;
 
         let req_type_id = std::any::TypeId::of::<Req>();
-        let resp_type_id = std::any::TypeId::of::<Req>();
+        let resp_type_id = std::any::TypeId::of::<Resp>();
 
         if self.request_map.insert(req_type_id, req_id).is_some()
         { panic!("request_map has this key already"); }

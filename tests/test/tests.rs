@@ -5,7 +5,7 @@ use bevy_simplenet_events::*;
 use bevy_app::*;
 use bevy_ecs::prelude::*;
 use bevy_kot_ecs::*;
-use bevy_simplenet::SessionId;
+use bevy_simplenet::{RequestToken, SessionId};
 use enfync::AdoptOrDefault;
 use serde::{Serialize, Deserialize};
 
@@ -198,6 +198,39 @@ fn check_client_received_message<T: SimplenetEvent + Eq + PartialEq>(
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
+fn get_server_request<Req: SimplenetEvent + Eq + PartialEq, Resp: SimplenetEvent + Eq + PartialEq>(
+    In(client_id) : In<SessionId>,
+    mut reader    : ServerRequestSource<DemoChannel, Req, Resp>
+) -> Option<(RequestToken, Req)>
+{
+    for (token, client_request) in reader.drain()
+    {
+        if token.client_id() != client_id { continue; }
+        return Some((token, client_request));
+    }
+
+    None
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn check_client_received_response<Req: SimplenetEvent + Eq + PartialEq, Resp: SimplenetEvent + Eq + PartialEq>(
+    In(response) : In<ServerResponse<Resp>>,
+    reader       : ClientResponseReader<DemoChannel, Req, Resp>
+) -> bool
+{
+    for server_response in reader.iter()
+    {
+        if *server_response == response { return true; }
+    }
+
+    false
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
 fn check_client_connected_on_server(In(client_id): In<SessionId>, reader: ServerConnectionReader<DemoChannel>) -> bool
 {
     for (session_id, connection) in reader.iter()
@@ -246,9 +279,47 @@ fn send_client_message<T: SimplenetEvent>(In(msg): In<T>, client: EventClient<De
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
+fn send_client_request<Req: SimplenetEvent>(In(request): In<Req>, client: EventClient<DemoChannel>)
+{
+    client.request(request).unwrap();
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
 fn send_server_message<T: SimplenetEvent>(In((client_id, msg)): In<(SessionId, T)>, server: EventServer<DemoChannel>)
 {
     server.send(client_id, msg).unwrap();
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn send_server_response<Req: SimplenetEvent, Resp: SimplenetEvent>(
+    In((token, response)) : In<(RequestToken, Resp)>,
+    server                : EventServer<DemoChannel>
+){
+    server.respond(token, response).unwrap();
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn send_server_ack<Req: SimplenetEvent, Resp: SimplenetEvent>(
+    In(token) : In<RequestToken>,
+    server    : EventServer<DemoChannel>
+){
+    server.ack(token).unwrap();
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn send_server_reject<Req: SimplenetEvent, Resp: SimplenetEvent>(
+    In(token) : In<RequestToken>,
+    server    : EventServer<DemoChannel>
+){
+    server.reject(token);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -401,6 +472,69 @@ fn client_multisystem_reader()
 //client request
 //server receives and responds
 //client receives
+#[test]
+fn client_request()
+{
+    // prepare tracing
+    /*
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(tracing::Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing::info!("ws hello world test: start");
+    */
+
+    let mut server_app = App::new();
+    let mut client_app = App::new();
+
+    let url = setup_server(&mut server_app);
+    let client_id = 0u128;
+    setup_client(&mut client_app, url, client_id, DemoConnectMsg(String::default()));
+
+    setup_event_app(&mut server_app);
+    setup_event_app(&mut client_app);
+
+    server_app.update();
+    client_app.update();
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    //note: must read connection events before sending is allowed
+    assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 1);
+    assert_eq!(syscall(&mut client_app.world, (), num_connection_events_client), 1);
+
+    syscall(&mut client_app.world, DemoRequest1(1), send_client_request::<DemoRequest1>);
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    let (token, req) = syscall(&mut server_app.world, client_id, get_server_request::<DemoRequest1, DemoResponse1>).unwrap();
+    let request_id = token.request_id();
+    assert_eq!(req, DemoRequest1(1));
+
+    syscall(&mut server_app.world, (token, DemoResponse1(2)), send_server_response::<DemoRequest1, DemoResponse1>);
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    assert!(syscall(
+            &mut client_app.world,
+            ServerResponse::Response(DemoResponse1(2), request_id),
+            check_client_received_response::<DemoRequest1, DemoResponse1>
+        ));
+    assert!(syscall(
+            &mut client_app.world,
+            ServerResponse::Response(DemoResponse1(2), request_id),
+            check_client_received_response::<DemoRequest1, DemoResponse1>
+        ));
+}
 
 //-------------------------------------------------------------------------------------------------------------------
 
