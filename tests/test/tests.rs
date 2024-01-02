@@ -15,22 +15,22 @@ use serde::{Serialize, Deserialize};
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug)]
+#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 struct DemoMsg1(usize);
 
-#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug)]
+#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 struct DemoMsg2(usize);
 
-#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug)]
+#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 struct DemoRequest1(usize);
 
-#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug)]
+#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 struct DemoRequest2(usize);
 
-#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug)]
+#[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 struct DemoResponse1(usize);
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 struct DemoConnectMsg(String);
 
 #[derive(Debug, Clone)]
@@ -165,6 +165,39 @@ fn num_response_events_client<Req: SimplenetEvent, Resp: SimplenetEvent>(
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
+fn check_server_received_message<T: SimplenetEvent + Eq + PartialEq>(
+    In((client_id, msg)) : In<(SessionId, T)>,
+    reader               : ServerMessageReader<DemoChannel, T>
+) -> bool
+{
+    for (session_id, client_msg) in reader.iter()
+    {
+        if client_id != session_id { continue; }
+        if msg == *client_msg { return true; }
+    }
+
+    false
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn check_client_received_message<T: SimplenetEvent + Eq + PartialEq>(
+    In(msg) : In<T>,
+    reader  : ClientMessageReader<DemoChannel, T>
+) -> bool
+{
+    for client_msg in reader.iter()
+    {
+        if msg == *client_msg { return true; }
+    }
+
+    false
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
 fn check_client_connected_on_server(In(client_id): In<SessionId>, reader: ServerConnectionReader<DemoChannel>) -> bool
 {
     for (session_id, connection) in reader.iter()
@@ -200,6 +233,22 @@ fn check_client_connected_on_client(reader: ClientConnectionReader<DemoChannel>)
     }
 
     return false
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn send_client_message<T: SimplenetEvent>(In(msg): In<T>, client: EventClient<DemoChannel>)
+{
+    client.send(msg).unwrap();
+}
+
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+
+fn send_server_message<T: SimplenetEvent>(In((client_id, msg)): In<(SessionId, T)>, server: EventServer<DemoChannel>)
+{
+    server.send(client_id, msg).unwrap();
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -242,6 +291,45 @@ fn client_connection()
 // server: multi-system reader
 //client message
 //server receives in multiple systems
+#[test]
+fn server_multisystem_reader()
+{
+    let mut server_app = App::new();
+    let mut client_app = App::new();
+
+    let url = setup_server(&mut server_app);
+    let client_id = 0u128;
+    setup_client(&mut client_app, url, client_id, DemoConnectMsg(String::default()));
+
+    setup_event_app(&mut server_app);
+    setup_event_app(&mut client_app);
+
+    server_app.update();
+    client_app.update();
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    //note: must read connection events before sending is allowed
+    assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 1);
+    assert_eq!(syscall(&mut client_app.world, (), num_connection_events_client), 1);
+
+    syscall(&mut client_app.world, DemoMsg1(10), send_client_message::<DemoMsg1>);
+    syscall(&mut client_app.world, DemoMsg2(20), send_client_message::<DemoMsg2>);
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    server_app.update();
+    client_app.update();
+
+    assert_eq!(syscall(&mut server_app.world, (), num_message_events_server::<DemoMsg1>), 1);
+    assert_eq!(syscall(&mut server_app.world, (), num_message_events_server::<DemoMsg2>), 1);
+
+    assert!(syscall(&mut server_app.world, (client_id, DemoMsg1(10)), check_server_received_message::<DemoMsg1>));
+    assert!(syscall(&mut server_app.world, (client_id, DemoMsg2(20)), check_server_received_message::<DemoMsg2>));
+}
 
 //-------------------------------------------------------------------------------------------------------------------
 
