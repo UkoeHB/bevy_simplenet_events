@@ -48,7 +48,7 @@ serde          = { version = "1.0" }
 serde_with     = { version = "3.0" }
 tracing        = { version = "0.1" }
 
-bevy_simplenet_events_derive = { path = "bevy_simplenet_events_derive" }
+bevy_simplenet_events_derive = { path = "bevy_simplenet_events_derive", version = "0.0.1" }
 
 [dev-dependencies]
 enfync             = { version = "0.1" }
