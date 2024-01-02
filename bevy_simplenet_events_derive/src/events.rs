@@ -20,7 +20,7 @@ pub(crate) fn derive_simplenet_event_impl(input: TokenStream) -> TokenStream
     let struct_name = &ast.ident;
 
     TokenStream::from(quote! {
-        impl #impl_generics ::bevy_simplenet::SimplenetEvent for #struct_name #ty_generics #where_clause {}
+        impl #impl_generics ::bevy_simplenet_events::SimplenetEvent for #struct_name #ty_generics #where_clause {}
     })
 }
 

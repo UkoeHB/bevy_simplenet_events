@@ -20,3 +20,5 @@ pub use crate::event_registry::*;
 pub use crate::client::*;
 #[cfg(feature = "server")]
 pub use crate::server::*;
+
+pub use bevy_simplenet_events_derive::*;

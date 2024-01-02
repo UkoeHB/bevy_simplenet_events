@@ -40,7 +40,7 @@ impl<E: EventPack> EventRegistry<E>
         self.id_counter += 1;
         let id = self.id_counter;
 
-        self.message_map.insert(type_id, id).unwrap();
+        if self.message_map.insert(type_id, id).is_some() { panic!("message map has this key already"); }
         self.message_ids.insert(id);
 
         id
@@ -56,10 +56,13 @@ impl<E: EventPack> EventRegistry<E>
         let req_type_id = std::any::TypeId::of::<Req>();
         let resp_type_id = std::any::TypeId::of::<Req>();
 
-        self.request_map.insert(req_type_id, req_id).expect("simplenet requests may only be registered once");
+        if self.request_map.insert(req_type_id, req_id).is_some()
+        { panic!("request_map has this key already"); }
         let _ = self.response_map.insert(resp_type_id, resp_id);  //allow reentry
-        self.request_response_map.insert(req_type_id, resp_type_id).unwrap();
-        self.request_response_ids.insert(req_id, resp_id).unwrap();
+        if self.request_response_map.insert(req_type_id, resp_type_id).is_some()
+        { panic!("request_response_map has this key already"); }
+        if self.request_response_ids.insert(req_id, resp_id).is_some()
+        { panic!("request_response_ids has this key already"); }
 
         (req_id, resp_id)
     }

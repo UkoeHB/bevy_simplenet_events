@@ -142,13 +142,14 @@ impl<E: EventPack> EventQueueConnectorClient<E>
         ));
 
         // add send-message
-        self.send_messages.insert(
-            message_event_id,
-            CallbackWith::new(
-                |world: &mut World, data: Vec<u8>|
-                { syscall(world, data, send_message::<E, T>); }
-            )
-        ).unwrap();
+        if self.send_messages.insert(
+                message_event_id,
+                CallbackWith::new(
+                    |world: &mut World, data: Vec<u8>|
+                    { syscall(world, data, send_message::<E, T>); }
+                )
+            ).is_some()
+        { panic!("message was already registered"); }
     }
 
     pub(crate) fn register_response<Req: SimplenetEvent, Resp: SimplenetEvent>(
@@ -167,7 +168,7 @@ impl<E: EventPack> EventQueueConnectorClient<E>
         ));
 
         // add send-request
-        self.send_responses
+        if self.send_responses
             .entry(response_event_id)
             .or_default()
             .insert(
@@ -176,7 +177,8 @@ impl<E: EventPack> EventQueueConnectorClient<E>
                     |world: &mut World, response: PendingResponse|
                     { syscall(world, response, send_response::<E, Req, Resp>); }
                 )
-            ).unwrap();
+            ).is_some()
+        { panic!("request/response was already registered"); }
     }
 
     pub(crate) fn clear_all(&self, world: &mut World)
