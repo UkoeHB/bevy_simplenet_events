@@ -238,7 +238,7 @@ Draining a request source consumes all requests, since we expect you to do somet
 ```rust
 fn read_client_requests(source: ServerRequestSource<DemoChannel, DemoRequest1, DemoResponse1>)
 {
-    for (session_id, request) in source.drain()
+    for (token, request) in source.drain()
     {
         todo!()
     }
