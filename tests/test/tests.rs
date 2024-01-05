@@ -517,7 +517,6 @@ fn client_request()
         .with_max_level(tracing::Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-    tracing::info!("ws hello world test: start");
     */
 
     let mut server_app = App::new();
@@ -588,7 +587,6 @@ fn client_request_acked_rejected()
         .with_max_level(tracing::Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-    tracing::info!("ws hello world test: start");
     */
 
     let mut server_app = App::new();
@@ -698,7 +696,6 @@ fn client_drops_old_server_msg()
         .with_max_level(tracing::Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-    tracing::info!("ws hello world test: start");
     */
 
     let mut server_app = App::new();
@@ -750,7 +747,6 @@ fn client_loses_old_server_response()
         .with_max_level(tracing::Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-    tracing::info!("ws hello world test: start");
     */
 
     let mut server_app = App::new();
@@ -864,7 +860,6 @@ fn server_drops_old_client_msg()
         .with_max_level(tracing::Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-    tracing::info!("ws hello world test: start");
     */
 
     let mut server_app = App::new();
