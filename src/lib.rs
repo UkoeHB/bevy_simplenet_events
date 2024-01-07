@@ -1,3 +1,6 @@
+//features
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 //documentation
 #![doc = include_str!("../README.md")]
 #![allow(unused_imports)]
@@ -8,8 +11,11 @@ mod core;
 mod event_registry;
 
 #[cfg(feature = "client")]
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 mod client;
+
 #[cfg(feature = "server")]
+#[cfg_attr(docsrs, doc(cfg(feature = "server")))]
 mod server;
 
 //API exports
