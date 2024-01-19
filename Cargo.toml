@@ -2,7 +2,7 @@
 name = "bevy_simplenet_events"
 description = "Event-based networking API built on bevy_simplenet"
 authors = ["koe <ukoe@protonmail.com>"]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 keywords = ["gamedev", "networking", "wasm", "events"]
 license = "MIT OR Apache-2.0"
