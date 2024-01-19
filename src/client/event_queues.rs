@@ -4,14 +4,9 @@ use crate::*;
 //third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_simplenet::ClientReport;
-use bincode::Options;
 
 //standard shortcuts
-use std::fmt::Debug;
-use std::collections::VecDeque;
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 //-------------------------------------------------------------------------------------------------------------------
 

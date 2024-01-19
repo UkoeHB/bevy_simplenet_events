@@ -9,8 +9,6 @@ use bincode::Options;
 
 //standard shortcuts
 use std::collections::HashMap;
-use std::fmt::Debug;
-use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 

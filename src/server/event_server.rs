@@ -4,12 +4,10 @@ use crate::*;
 //third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
-use bevy_simplenet::{CloseFrame, MessageSignal, RequestToken, SessionId};
-use bincode::Options;
+use bevy_simplenet::{CloseFrame, RequestToken, SessionId};
 
 //standard shortcuts
-use std::fmt::Debug;
-use std::sync::atomic::{AtomicBool, Ordering};
+
 
 //-------------------------------------------------------------------------------------------------------------------
 

@@ -5,13 +5,9 @@ use crate::*;
 use bevy_app::{App, First};
 use bevy_ecs::prelude::*;
 use bevy_simplenet::{Client, ClientEvent, ClientReport};
-use bincode::Options;
-use serde::{Serialize, Deserialize};
-use serde_with::{Bytes, serde_as};
 
 //standard shortcuts
-use std::fmt::Debug;
-use std::marker::PhantomData;
+
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------

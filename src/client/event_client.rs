@@ -5,11 +5,8 @@ use crate::*;
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 use bevy_simplenet::{MessageSignal, RequestSignal};
-use bincode::Options;
 
 //standard shortcuts
-use std::fmt::Debug;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 //-------------------------------------------------------------------------------------------------------------------
 

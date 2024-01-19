@@ -3,7 +3,7 @@
 
 //documentation
 #![doc = include_str!("../README.md")]
-#![allow(unused_imports)]
+#[allow(unused_imports)]
 use crate as bevy_simplenet_events;
 
 //module tree
@@ -20,7 +20,7 @@ mod server;
 
 //API exports
 pub use crate::core::*;
-pub use crate::event_registry::*;
+pub(crate) use crate::event_registry::*;
 
 #[cfg(feature = "client")]
 pub use crate::client::*;

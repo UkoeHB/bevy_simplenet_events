@@ -8,8 +8,8 @@ mod readers;
 
 //API exports
 pub use crate::server::app_ext::*;
-pub use crate::server::event_queue_connector::*;
-pub use crate::server::event_queues::*;
+pub(crate) use crate::server::event_queue_connector::*;
+pub(crate) use crate::server::event_queues::*;
 pub use crate::server::event_server::*;
-pub use crate::server::event_server_core::*;
+pub(crate) use crate::server::event_server_core::*;
 pub use crate::server::readers::*;

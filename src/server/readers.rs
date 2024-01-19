@@ -4,12 +4,10 @@ use crate::*;
 //third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
-use bevy_simplenet::{ClientReport, RequestToken, ServerReport, SessionId};
+use bevy_simplenet::{RequestToken, ServerReport, SessionId};
 
 //standard shortcuts
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, Ordering};
+
 
 //-------------------------------------------------------------------------------------------------------------------
 

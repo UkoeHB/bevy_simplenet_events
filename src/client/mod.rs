@@ -10,8 +10,8 @@ mod server_response;
 //API exports
 pub use crate::client::app_ext::*;
 pub use crate::client::event_client::*;
-pub use crate::client::event_client_core::*;
-pub use crate::client::event_queue_connector::*;
-pub use crate::client::event_queues::*;
+pub(crate) use crate::client::event_client_core::*;
+pub(crate) use crate::client::event_queue_connector::*;
+pub(crate) use crate::client::event_queues::*;
 pub use crate::client::readers::*;
 pub use crate::client::server_response::*;

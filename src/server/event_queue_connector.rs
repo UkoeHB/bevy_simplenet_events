@@ -5,15 +5,12 @@ use crate::*;
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::Command;
 use bevy_kot_ecs::*;
-use bevy_simplenet::{ClientReport, RequestToken, ServerReport, SessionId};
+use bevy_simplenet::{RequestToken, ServerReport, SessionId};
 use bincode::Options;
 
 //standard shortcuts
-use std::fmt::Debug;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------

@@ -3,15 +3,10 @@ use crate::*;
 
 //third-party shortcuts
 use bevy_ecs::prelude::*;
-use bevy_simplenet::{ClientReport, RequestToken, ServerReport, SessionId};
-use bincode::Options;
+use bevy_simplenet::{RequestToken, ServerReport, SessionId};
 
 //standard shortcuts
-use std::fmt::Debug;
-use std::collections::VecDeque;
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 //-------------------------------------------------------------------------------------------------------------------
 

@@ -9,11 +9,8 @@ use bevy_simplenet::ClientReport;
 use bincode::Options;
 
 //standard shortcuts
-use std::fmt::Debug;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------

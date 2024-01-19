@@ -7,9 +7,7 @@ use bevy_ecs::system::SystemParam;
 use bevy_simplenet::ClientReport;
 
 //standard shortcuts
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, Ordering};
+
 
 //-------------------------------------------------------------------------------------------------------------------
 
