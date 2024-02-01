@@ -24,19 +24,19 @@ impl<'w, E: EventPack> EventServer<'w, E>
     /// Sends a message to a client.
     ///
     /// This will fail if there is a pending `ServerReport::Connected` that hasn't been read by any systems.
-    pub fn send<T: SimplenetEvent>(&self, session_id: SessionId, message: T) -> Result<(), ()>
+    pub fn send<T: SimplenetEvent>(&self, session_id: SessionId, message: T)
     {
         self.server.send(&self.registry, session_id, message)
     }
 
     /// Responds to a client request.
-    pub fn respond<Resp: SimplenetEvent>(&self, token: RequestToken, response: Resp) -> Result<(), ()>
+    pub fn respond<Resp: SimplenetEvent>(&self, token: RequestToken, response: Resp)
     {
         self.server.respond(&self.registry, token, response)
     }
 
     /// Acknowledges a client request.
-    pub fn ack(&self, token: RequestToken) -> Result<(), ()>
+    pub fn ack(&self, token: RequestToken)
     {
         self.server.ack(token)
     }
@@ -50,7 +50,7 @@ impl<'w, E: EventPack> EventServer<'w, E>
     /// Closes a client.
     ///
     /// All messages and requests submitted to the client after this is called will fail to send.
-    pub fn close_session(&self, session_id: SessionId, close_frame: Option<CloseFrame>) -> Result<(), ()>
+    pub fn close_session(&self, session_id: SessionId, close_frame: Option<CloseFrame>)
     {
         self.server.close_session(session_id, close_frame)
     }

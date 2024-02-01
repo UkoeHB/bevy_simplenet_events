@@ -87,16 +87,15 @@ impl<E: EventPack> EventServerCore<E>
         registry   : &EventRegistry<E>,
         session_id : SessionId,
         message    : T
-    ) -> Result<(), ()>
-    {
+    ){
         if self.pending_connect(session_id).is_some()
-        { tracing::warn!(session_id, "dropping message because there is a pending connect event"); return Err(()); };
+        { tracing::warn!(session_id, "dropping message because there is a pending connect event"); return; };
 
         let Some(message_event_id) = registry.get_message_id::<T>()
-        else { tracing::error!("server message type is not registered"); return Err(()); };
+        else { tracing::error!("server message type is not registered"); return; };
 
         let Ok(data) = bincode::DefaultOptions::new().serialize(&message)
-        else { tracing::error!("failed serializing server message"); return Err(()); };
+        else { tracing::error!("failed serializing server message"); return; };
 
         self.inner.send(session_id, InternalEvent{ id: message_event_id, data })
     }
@@ -107,27 +106,26 @@ impl<E: EventPack> EventServerCore<E>
         registry : &EventRegistry<E>,
         token    : RequestToken,
         response : Resp
-    ) -> Result<(), ()>
-    {
+    ){
         let session_id = token.client_id();
         if self.pending_connect(session_id).is_some()
-        { tracing::warn!(session_id, "dropping response because there is a pending connect event"); return Err(()); };
+        { tracing::warn!(session_id, "dropping response because there is a pending connect event"); return; };
 
         let Some(response_event_id) = registry.get_response_id::<Resp>()
-        else { tracing::error!("server response type is not registered"); return Err(()); };
+        else { tracing::error!("server response type is not registered"); return; };
 
         let Ok(data) = bincode::DefaultOptions::new().serialize(&response)
-        else { tracing::error!("failed serializing server response"); return Err(()); };
+        else { tracing::error!("failed serializing server response"); return; };
 
         self.inner.respond(token, InternalEvent{ id: response_event_id, data })
     }
 
     /// Sends an ack to a client.
-    pub(crate) fn ack(&self, token: RequestToken) -> Result<(), ()>
+    pub(crate) fn ack(&self, token: RequestToken)
     {
         let session_id = token.client_id();
         if self.pending_connect(session_id).is_some()
-        { tracing::warn!(session_id, "dropping response because there is a pending connect event"); return Err(()); };
+        { tracing::warn!(session_id, "dropping response because there is a pending connect event"); return; };
 
         self.inner.ack(token)
     }
@@ -139,7 +137,7 @@ impl<E: EventPack> EventServerCore<E>
     }
 
     /// Closes a client's connection.
-    pub(crate) fn close_session(&self, session_id: SessionId, close_frame: Option<CloseFrame>) -> Result<(), ()>
+    pub(crate) fn close_session(&self, session_id: SessionId, close_frame: Option<CloseFrame>)
     {
         self.inner.close_session(session_id, close_frame)
     }

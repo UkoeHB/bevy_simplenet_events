@@ -84,16 +84,27 @@ impl<E: EventPack> EventClientCore<E>
     }
 
     /// Sends a message to the server.
-    pub(crate) fn send<T: SimplenetEvent>(&self, registry: &EventRegistry<E>, message: T) -> Result<MessageSignal, ()>
+    pub(crate) fn send<T: SimplenetEvent>(&self, registry: &EventRegistry<E>, message: T) -> MessageSignal
     {
         if self.pending_connect().is_some()
-        { tracing::warn!("dropping client message because there is a pending connect event"); return Err(()); };
+        {
+            tracing::warn!("dropping client message because there is a pending connect event");
+            return MessageSignal::new(MessageStatus::Failed);
+        };
 
         let Some(message_event_id) = registry.get_message_id::<T>()
-        else { tracing::error!("client message type is not registered"); return Err(()); };
+        else
+        {
+            tracing::error!("client message type is not registered");
+            return MessageSignal::new(MessageStatus::Failed);
+        };
 
         let Ok(data) = bincode::DefaultOptions::new().serialize(&message)
-        else { tracing::error!("failed serializing client message"); return Err(()); };
+        else
+        {
+            tracing::error!("failed serializing client message");
+            return MessageSignal::new(MessageStatus::Failed);
+        };
 
         self.inner.send(InternalEvent{ id: message_event_id, data })
     }
@@ -114,16 +125,13 @@ impl<E: EventPack> EventClientCore<E>
 
         let result = self.inner.request(InternalEvent{ id: request_event_id, data });
 
-        if let Ok(signal) = &result
+        // use channel since we are immutable
+        if self.request_sender.send((result.id(), (request_event_id, response_event_id))).is_err()
         {
-            // use channel since we are immutable
-            if self.request_sender.send((signal.id(), (request_event_id, response_event_id))).is_err()
-            {
-                tracing::error!("request tracker channel is broken");
-            }
+            tracing::error!("request tracker channel is broken");
         }
 
-        result
+        Ok(result)
     }
 
     /// Removes a request from the request tracker.

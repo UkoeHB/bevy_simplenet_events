@@ -23,7 +23,7 @@ impl<'w, E: EventPack> EventClient<'w, E>
     /// Sends a message to the server.
     ///
     /// This will fail if there is a pending `ClientReport::Connected` that hasn't been read by any systems.
-    pub fn send<T: SimplenetEvent>(&self, message: T) -> Result<MessageSignal, ()>
+    pub fn send<T: SimplenetEvent>(&self, message: T) -> MessageSignal
     {
         self.client.send(&self.registry, message)
     }

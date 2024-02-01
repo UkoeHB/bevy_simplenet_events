@@ -5,7 +5,7 @@ use bevy_simplenet_events::*;
 use bevy_app::*;
 use bevy_ecs::prelude::*;
 use bevy_kot_ecs::*;
-use bevy_simplenet::{RequestToken, SessionId};
+use bevy_simplenet::{MessageStatus, RequestToken, SessionId};
 use enfync::AdoptOrDefault;
 use serde::{Serialize, Deserialize};
 
@@ -274,7 +274,7 @@ fn check_client_connected_on_client(reader: ClientConnectionReader<DemoChannel>)
 
 fn send_client_message<T: SimplenetEvent>(In(msg): In<T>, client: EventClient<DemoChannel>)
 {
-    client.send(msg).unwrap();
+    client.send(msg);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -282,7 +282,8 @@ fn send_client_message<T: SimplenetEvent>(In(msg): In<T>, client: EventClient<De
 
 fn try_send_client_message<T: SimplenetEvent>(In(msg): In<T>, client: EventClient<DemoChannel>) -> bool
 {
-    client.send(msg).is_ok()
+    let signal = client.send(msg);
+    signal.status() != MessageStatus::Failed
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -298,18 +299,7 @@ fn send_client_request<Req: SimplenetEvent>(In(request): In<Req>, client: EventC
 
 fn send_server_message<T: SimplenetEvent>(In((client_id, msg)): In<(SessionId, T)>, server: EventServer<DemoChannel>)
 {
-    server.send(client_id, msg).unwrap();
-}
-
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-
-fn try_send_server_message<T: SimplenetEvent>(
-    In((client_id, msg)) : In<(SessionId, T)>,
-    server               : EventServer<DemoChannel>
-) -> bool
-{
-    server.send(client_id, msg).is_ok()
+    server.send(client_id, msg);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -319,7 +309,7 @@ fn send_server_response<Req: SimplenetEvent, Resp: SimplenetEvent>(
     In((token, response)) : In<(RequestToken, Resp)>,
     server                : EventServer<DemoChannel>
 ){
-    server.respond(token, response).unwrap();
+    server.respond(token, response);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -329,7 +319,7 @@ fn send_server_ack<Req: SimplenetEvent, Resp: SimplenetEvent>(
     In(token) : In<RequestToken>,
     server    : EventServer<DemoChannel>
 ){
-    server.ack(token).unwrap();
+    server.ack(token);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -347,7 +337,7 @@ fn send_server_reject<Req: SimplenetEvent, Resp: SimplenetEvent>(
 
 fn disconnect_client_on_server(In(session_id): In<SessionId>, server: EventServer<DemoChannel>)
 {
-    server.close_session(session_id, None).unwrap();
+    server.close_session(session_id, None);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -921,12 +911,12 @@ fn server_send_blocked_until_read_connect()
     server_app.update();
     client_app.update();
 
-    assert!(!syscall(&mut server_app.world, (client_id, DemoMsg1(1)), try_send_server_message::<DemoMsg1>));
+    syscall(&mut server_app.world, (client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
 
     assert_eq!(syscall(&mut server_app.world, (), num_connection_events_server), 1);
     assert_eq!(syscall(&mut client_app.world, (), num_connection_events_client), 1);
 
-    assert!(syscall(&mut server_app.world, (client_id, DemoMsg1(10)), try_send_server_message::<DemoMsg1>));
+    syscall(&mut server_app.world, (client_id, DemoMsg1(10)), send_server_message::<DemoMsg1>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 

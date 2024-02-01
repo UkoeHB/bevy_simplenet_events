@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0]
+
+### Changed
+
+- Update to `bevy_simplenet` v0.8.0.
+- Update to `bevy_kot` v0.11.0.
+
+
 ## [0.1.2]
 
 ### Changed
