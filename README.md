@@ -104,16 +104,16 @@ Prepare server setup function (example).
 ```rust
 fn setup_server(app: &mut App) -> url::Url
 {
-    let websocket_server = demo_server_factory().new_server(
+    let server = demo_server_factory().new_server(
             enfync::builtin::native::TokioHandle::adopt_or_default(),
             "127.0.0.1:0",
             bevy_simplenet::AcceptorConfig::Default,
             bevy_simplenet::Authenticator::None,
             bevy_simplenet::ServerConfig::default(),
         );
-    let url = websocket_server.url();
+    let url = server.url();
 
-    app.insert_simplenet_server(websocket_server);
+    app.insert_simplenet_server(server);
     event_setup(app);
 
     url
@@ -136,7 +136,7 @@ Prepare client setup function (example).
 ```rust
 fn setup_client(app: &mut App, url: url::Url, client_id: SessionId, connect_msg: DemoConnectMsg)
 {
-    let websocket_client = demo_client_factory().new_client(
+    let client = demo_client_factory().new_client(
             enfync::builtin::Handle::adopt_or_default(),
             url,
             bevy_simplenet::AuthRequest::None{ client_id },
@@ -144,7 +144,7 @@ fn setup_client(app: &mut App, url: url::Url, client_id: SessionId, connect_msg:
             connect_msg
         );
 
-    app.insert_simplenet_client(websocket_client);
+    app.insert_simplenet_client(client);
     event_setup(app);
 }
 ```
@@ -198,8 +198,8 @@ Any registered message type can be sent.
 ```rust
 fn send_client_message(client: EventClient<DemoChannel>)
 {
-    client.send(DemoMsg1(42)).unwrap();
-    client.send(DemoMsg2(24)).unwrap();
+    client.send(DemoMsg1(42));
+    client.send(DemoMsg2(24));
 }
 ```
 
