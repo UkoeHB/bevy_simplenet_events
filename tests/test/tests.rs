@@ -369,7 +369,6 @@ fn client_connection()
     setup_event_app(&mut client_app);
 
     server_app.update();
-    client_app.update();
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -406,8 +405,6 @@ fn server_multisystem_reader()
     setup_event_app(&mut client_app2);
 
     server_app.update();
-    client_app1.update();
-    client_app2.update();
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -459,8 +456,6 @@ fn client_multisystem_reader()
     setup_event_app(&mut client_app2);
 
     server_app.update();
-    client_app1.update();
-    client_app2.update();
 
     std::thread::sleep(std::time::Duration::from_millis(75));
 
@@ -520,7 +515,6 @@ fn client_request()
     setup_event_app(&mut client_app);
 
     server_app.update();
-    client_app.update();
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -588,7 +582,6 @@ fn client_request_acked_rejected()
     setup_event_app(&mut client_app);
 
     server_app.update();
-    client_app.update();
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -695,7 +688,6 @@ fn client_drops_old_server_msg()
     setup_event_app(&mut client_app);
 
     server_app.update();
-    client_app.update();
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -746,7 +738,6 @@ fn client_loses_old_server_response()
     setup_event_app(&mut client_app);
 
     server_app.update();
-    client_app.update();
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -808,7 +799,6 @@ fn client_send_blocked_until_read_connect()
     setup_event_app(&mut client_app);
 
     server_app.update();
-    client_app.update();
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -857,9 +847,8 @@ fn server_drops_old_client_msg()
     setup_event_app(&mut client_app);
 
     server_app.update();
-    client_app.update();
 
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    std::thread::sleep(std::time::Duration::from_millis(100));
 
     server_app.update();
     client_app.update();
@@ -888,6 +877,14 @@ fn server_drops_old_client_msg()
 #[test]
 fn server_send_blocked_until_read_connect()
 {
+    // prepare tracing
+    /*
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(tracing::Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    */
+
     let mut server_app = App::new();
     let mut client_app = App::new();
 
@@ -898,9 +895,8 @@ fn server_send_blocked_until_read_connect()
     setup_event_app(&mut client_app);
 
     server_app.update();
-    client_app.update();
 
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    std::thread::sleep(std::time::Duration::from_millis(25));
 
     server_app.update();
     client_app.update();
