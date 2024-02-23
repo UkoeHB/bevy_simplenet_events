@@ -3,9 +3,9 @@ use crate::*;
 
 //third-party shortcuts
 use bevy_ecs::prelude::*;
-use bevy_kot_utils::*;
 use bevy_simplenet::*;
 use bincode::Options;
+use crossbeam::channel::{Receiver, Sender};
 
 //standard shortcuts
 use std::collections::HashMap;
@@ -40,7 +40,7 @@ impl<E: EventPack> EventClientCore<E>
     /// Makes a new event client core.
     pub(crate) fn new(client: Client<EventWrapper<E>>) -> Self
     {
-        let (request_sender, request_receiver) = new_channel();
+        let (request_sender, request_receiver) = crossbeam::channel::unbounded();
         Self{
             inner           : client,
             counter         : 0u32,
@@ -138,7 +138,7 @@ impl<E: EventPack> EventClientCore<E>
     pub(crate) fn remove_request(&mut self, request_id: u64) -> Option<(u16, u16)>
     {
         // drain pending request-tracker entries now that we are mutable
-        while let Some((request_id, event_ids)) = self.request_receiver.try_recv()
+        while let Ok((request_id, event_ids)) = self.request_receiver.try_recv()
         {
             self.request_map.insert(request_id, event_ids);
         }
