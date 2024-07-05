@@ -2,8 +2,6 @@
 
 Provides an events-based API for handling a networked connection, built on top of [`bevy_simplenet`](https://github.com/UkoeHB/bevy_simplenet).
 
-This crate requires nightly rust.
-
 
 ### Usage notes
 
