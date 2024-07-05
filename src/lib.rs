@@ -1,5 +1,6 @@
 //features
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![allow(rustdoc::redundant_explicit_links)]
 //documentation
 #![doc = include_str!("../README.md")]
 #[allow(unused_imports)]
