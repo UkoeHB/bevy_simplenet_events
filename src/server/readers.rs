@@ -4,7 +4,7 @@ use crate::*;
 //third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
-use bevy_simplenet::{RequestToken, ServerReport, SessionId};
+use bevy_simplenet::{RequestToken, ServerReport, ClientId};
 
 //standard shortcuts
 
@@ -22,7 +22,7 @@ pub struct ServerConnectionReader<'w, E: EventPack>
 impl<'w, E: EventPack> ServerConnectionReader<'w, E>
 {
     /// Iterates the available connection reports.
-    pub fn iter(&self) -> impl Iterator<Item = (SessionId, &ServerReport<E::ConnectMsg>)> + '_
+    pub fn iter(&self) -> impl Iterator<Item = (ClientId, &ServerReport<E::ConnectMsg>)> + '_
     {
         self.events
             .iter()
@@ -47,7 +47,7 @@ pub struct ServerMessageReader<'w, E: EventPack, T: SimplenetEvent>
 impl<'w, E: EventPack, T: SimplenetEvent> ServerMessageReader<'w, E, T>
 {
     /// Iterates the available client messages.
-    pub fn iter(&self) -> impl Iterator<Item = (SessionId, &T)> + '_
+    pub fn iter(&self) -> impl Iterator<Item = (ClientId, &T)> + '_
     {
         self.events
             .iter()

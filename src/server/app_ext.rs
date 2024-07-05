@@ -82,7 +82,7 @@ impl SimplenetServerEventAppExt for App
 {
     fn insert_simplenet_server<E: EventPack>(&mut self, server: Server<EventWrapper<E>>) -> &mut Self
     {
-        if self.world.contains_resource::<EventServerCore<E>>()
+        if self.world().contains_resource::<EventServerCore<E>>()
         {
             panic!("event server was already inserted");
         }

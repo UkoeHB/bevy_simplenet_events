@@ -3,7 +3,7 @@ use crate::*;
 
 //third-party shortcuts
 use bevy_ecs::prelude::*;
-use bevy_simplenet::{RequestToken, ServerReport, SessionId};
+use bevy_simplenet::{RequestToken, ServerReport, ClientId};
 
 //standard shortcuts
 use std::marker::PhantomData;
@@ -15,7 +15,7 @@ pub(crate) struct ServerConnectionQueue<E: EventPack>
 {
     /// Includes event counter for use in synchronizing with [`EventServer::send`] the first time a
     /// `ServerReport::Connected` is iterated over.
-    queue: Vec<(u32, SessionId, ServerReport<E::ConnectMsg>)>,
+    queue: Vec<(u32, ClientId, ServerReport<E::ConnectMsg>)>,
 }
 
 impl<E: EventPack> ServerConnectionQueue<E>
@@ -25,12 +25,12 @@ impl<E: EventPack> ServerConnectionQueue<E>
         self.queue.clear();
     }
 
-    pub(crate) fn send(&mut self, counter: u32, session_id: SessionId, report: ServerReport<E::ConnectMsg>)
+    pub(crate) fn send(&mut self, counter: u32, client_id: ClientId, report: ServerReport<E::ConnectMsg>)
     {
-        self.queue.push((counter, session_id, report));
+        self.queue.push((counter, client_id, report));
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &(u32, SessionId, ServerReport<E::ConnectMsg>)> + '_
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &(u32, ClientId, ServerReport<E::ConnectMsg>)> + '_
     {
         self.queue.iter()
     }
@@ -46,7 +46,7 @@ impl<E: EventPack> Default for ServerConnectionQueue<E>
 #[derive(Resource)]
 pub(crate) struct ServerMessageQueue<E: EventPack, T: SimplenetEvent>
 {
-    queue: Vec<Option<(SessionId, T)>>,
+    queue: Vec<Option<(ClientId, T)>>,
     phantom: PhantomData<E>,
 }
 
@@ -57,7 +57,7 @@ impl<E: EventPack, T: SimplenetEvent> ServerMessageQueue<E, T>
         self.queue.clear();
     }
 
-    pub(crate) fn clear_session(&mut self, session_id: SessionId)
+    pub(crate) fn clear_session(&mut self, client_id: ClientId)
     {
         self.queue
             .iter_mut()
@@ -66,7 +66,7 @@ impl<E: EventPack, T: SimplenetEvent> ServerMessageQueue<E, T>
                 {
                     match i
                     {
-                        Some(i) => i.0 == session_id,
+                        Some(i) => i.0 == client_id,
                         None    => false,
                     }
                 }
@@ -74,12 +74,12 @@ impl<E: EventPack, T: SimplenetEvent> ServerMessageQueue<E, T>
             .for_each(|i| { *i = None; });
     }
 
-    pub(crate) fn send(&mut self, session_id: SessionId, message: T)
+    pub(crate) fn send(&mut self, client_id: ClientId, message: T)
     {
-        self.queue.push(Some((session_id, message)));
+        self.queue.push(Some((client_id, message)));
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &(SessionId, T)> + '_
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &(ClientId, T)> + '_
     {
         self.queue
             .iter()
@@ -108,7 +108,7 @@ impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ServerRequestQueue
         self.queue.clear();
     }
 
-    pub(crate) fn clear_session(&mut self, session_id: SessionId)
+    pub(crate) fn clear_session(&mut self, client_id: ClientId)
     {
         self.queue
             .iter_mut()
@@ -117,7 +117,7 @@ impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ServerRequestQueue
                 {
                     match i
                     {
-                        Some(i) => i.0.client_id() == session_id,
+                        Some(i) => i.0.client_id() == client_id,
                         None    => false,
                     }
                 }

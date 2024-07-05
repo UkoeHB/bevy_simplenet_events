@@ -18,7 +18,7 @@ use std::marker::PhantomData;
 fn setup_simplenet_event_framwork<E: EventPack>(app: &mut App)
 {
     // only set up once
-    if app.world.contains_resource::<EventRegistry<E>>() { return; }
+    if app.world().contains_resource::<EventRegistry<E>>() { return; }
 
     // add event registry
     // - this can only be done from within this crate
@@ -127,12 +127,12 @@ impl SimplenetEventAppExt for App
         #[cfg(feature = "client")]
         {
             // register type
-            let message_event_id = self.world
+            let message_event_id = self.world_mut()
                 .resource_mut::<EventRegistry<E>>()
                 .register_message::<T>();
 
             // register event
-            self.world.resource_mut::<EventQueueConnectorClient<E>>().register_message::<T>(message_event_id);
+            self.world_mut().resource_mut::<EventQueueConnectorClient<E>>().register_message::<T>(message_event_id);
             self.init_resource::<ClientMessageQueue<E, T>>();
         }
 
@@ -147,12 +147,12 @@ impl SimplenetEventAppExt for App
         #[cfg(feature = "server")]
         {
             // register type
-            let message_event_id = self.world
+            let message_event_id = self.world_mut()
                 .resource_mut::<EventRegistry<E>>()
                 .register_message::<T>();
 
             // register event
-            self.world.resource_mut::<EventQueueConnectorServer<E>>().register_message::<T>(message_event_id);
+            self.world_mut().resource_mut::<EventQueueConnectorServer<E>>().register_message::<T>(message_event_id);
             self.init_resource::<ServerMessageQueue<E, T>>();
         }
 
@@ -165,7 +165,7 @@ impl SimplenetEventAppExt for App
         setup_simplenet_event_framwork::<E>(self);
 
         // register type
-        let (request_event_id, response_event_id) = self.world
+        let (request_event_id, response_event_id) = self.world_mut()
             .resource_mut::<EventRegistry<E>>()
             .register_request_response::<Req, Resp>();
 
@@ -174,7 +174,7 @@ impl SimplenetEventAppExt for App
         // - responses are read on the client
         #[cfg(feature = "server")]
         {
-            self.world
+            self.world_mut()
                 .resource_mut::<EventQueueConnectorServer<E>>()
                 .register_request::<Req, Resp>(request_event_id, response_event_id);
             self.init_resource::<ServerRequestQueue<E, Req, Resp>>();
@@ -182,7 +182,7 @@ impl SimplenetEventAppExt for App
 
         #[cfg(feature = "client")]
         {
-            self.world
+            self.world_mut()
                 .resource_mut::<EventQueueConnectorClient<E>>()
                 .register_response::<Req, Resp>(request_event_id, response_event_id);
             self.init_resource::<ClientResponseQueue<E, Req, Resp>>();

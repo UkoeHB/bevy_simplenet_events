@@ -3,7 +3,7 @@ use crate::*;
 
 //third-party shortcuts
 use bevy_ecs::prelude::*;
-use bevy_ecs::system::Command;
+use bevy_ecs::world::Command;
 use bevy_cobweb::prelude::*;
 use bevy_simplenet::ClientReport;
 use bincode::Options;

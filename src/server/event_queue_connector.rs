@@ -3,9 +3,9 @@ use crate::*;
 
 //third-party shortcuts
 use bevy_ecs::prelude::*;
-use bevy_ecs::system::Command;
+use bevy_ecs::world::Command;
 use bevy_cobweb::prelude::*;
-use bevy_simplenet::{RequestToken, ServerReport, SessionId};
+use bevy_simplenet::{RequestToken, ServerReport, ClientId};
 use bincode::Options;
 
 //standard shortcuts
@@ -24,12 +24,12 @@ fn clear_connection_queue<E: EventPack>(mut queue: ResMut<ServerConnectionQueue<
 //-------------------------------------------------------------------------------------------------------------------
 
 fn clear_message_queue<E: EventPack, T: SimplenetEvent>(
-    In(session_id) : In<Option<SessionId>>,
+    In(client_id) : In<Option<ClientId>>,
     mut queue      : ResMut<ServerMessageQueue<E, T>>
 ){
-    match session_id
+    match client_id
     {
-        Some(session_id) => queue.clear_session(session_id),
+        Some(client_id) => queue.clear_session(client_id),
         None             => queue.clear(),
     }
 }
@@ -38,12 +38,12 @@ fn clear_message_queue<E: EventPack, T: SimplenetEvent>(
 //-------------------------------------------------------------------------------------------------------------------
 
 fn clear_request_queue<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(
-    In(session_id) : In<Option<SessionId>>,
+    In(client_id) : In<Option<ClientId>>,
     mut queue      : ResMut<ServerRequestQueue<E, Req, Resp>>
 ){
-    match session_id
+    match client_id
     {
-        Some(session_id) => queue.clear_session(session_id),
+        Some(client_id) => queue.clear_session(client_id),
         None             => queue.clear(),
     }
 }
@@ -52,17 +52,17 @@ fn clear_request_queue<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(
 //-------------------------------------------------------------------------------------------------------------------
 
 fn send_connection<E: EventPack>(
-    In((counter, session_id, report)) : In<(u32, SessionId, ServerReport<E::ConnectMsg>)>,
+    In((counter, client_id, report)) : In<(u32, ClientId, ServerReport<E::ConnectMsg>)>,
     mut queue                         : ResMut<ServerConnectionQueue<E>>
 ){
-    queue.send(counter, session_id, report);
+    queue.send(counter, client_id, report);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 fn send_message<E: EventPack, T: SimplenetEvent>(
-    In((session_id, data)) : In<(SessionId, Vec<u8>)>,
+    In((client_id, data)) : In<(ClientId, Vec<u8>)>,
     mut queue              : ResMut<ServerMessageQueue<E, T>>
 ){
     let Ok(message) = bincode::DefaultOptions::new().deserialize(&data[..])
@@ -72,7 +72,7 @@ fn send_message<E: EventPack, T: SimplenetEvent>(
         return;
     };
 
-    queue.send(session_id, message);
+    queue.send(client_id, message);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -100,12 +100,12 @@ fn send_request<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent>(
 pub(crate) struct EventQueueConnectorServer<E: EventPack>
 {
     /// Cached systems for clearing event queues.
-    clear_message_queues: Vec<CallbackWith<(), Option<SessionId>>>,
-    clear_request_queues: Vec<CallbackWith<(), Option<SessionId>>>,
+    clear_message_queues: Vec<CallbackWith<(), Option<ClientId>>>,
+    clear_request_queues: Vec<CallbackWith<(), Option<ClientId>>>,
 
     /// Cached systems for sending message events.
     /// [ message event id : callback ]
-    send_messages: HashMap<u16, CallbackWith<(), (SessionId, Vec<u8>)>>,
+    send_messages: HashMap<u16, CallbackWith<(), (ClientId, Vec<u8>)>>,
     /// Cached systems for sending response events.
     /// [ response event id : [ request event id : callback ] ]
     send_requests: HashMap<u16, HashMap<u16, CallbackWith<(), (RequestToken, Vec<u8>)>>>,
@@ -119,14 +119,14 @@ impl<E: EventPack> EventQueueConnectorServer<E>
     {
         // add clear-message
         self.clear_message_queues.push(CallbackWith::new(
-            |world: &mut World, target: Option<SessionId>| { syscall(world, target, clear_message_queue::<E, T>); }
+            |world: &mut World, target: Option<ClientId>| { syscall(world, target, clear_message_queue::<E, T>); }
         ));
 
         // add send-message
         if self.send_messages.insert(
                 message_event_id,
                 CallbackWith::new(
-                    |world: &mut World, package: (SessionId, Vec<u8>)|
+                    |world: &mut World, package: (ClientId, Vec<u8>)|
                     { syscall(world, package, send_message::<E, T>); }
                 )
             ).is_some()
@@ -140,7 +140,7 @@ impl<E: EventPack> EventQueueConnectorServer<E>
     ){
         // add clear-request
         self.clear_request_queues.push(CallbackWith::new(
-            |world: &mut World, target: Option<SessionId>| { syscall(world, target, clear_request_queue::<E, Req, Resp>); }
+            |world: &mut World, target: Option<ClientId>| { syscall(world, target, clear_request_queue::<E, Req, Resp>); }
         ));
 
         // add send-request
@@ -160,7 +160,7 @@ impl<E: EventPack> EventQueueConnectorServer<E>
     pub(crate) fn clear_all(&self, world: &mut World)
     {
         // clear connection events
-        syscall(world, (), clear_connection_queue::<E>);
+        world.syscall((), clear_connection_queue::<E>);
 
         // clear messages
         for cb in self.clear_message_queues.iter()
@@ -175,20 +175,20 @@ impl<E: EventPack> EventQueueConnectorServer<E>
         }
     }
 
-    pub(crate) fn handle_disconnect(&self, world: &mut World, session_id: SessionId)
+    pub(crate) fn handle_disconnect(&self, world: &mut World, client_id: ClientId)
     {
-        tracing::trace!(session_id, "clearing server queues on disconnect");
+        tracing::trace!(client_id, "clearing server queues on disconnect");
 
         // clear messages for this client
         for cb in self.clear_message_queues.iter()
         {
-            cb.call_with(Some(session_id)).apply(world);
+            cb.call_with(Some(client_id)).apply(world);
         }
 
         // clear requests for this client
         for cb in self.clear_request_queues.iter()
         {
-            cb.call_with(Some(session_id)).apply(world);
+            cb.call_with(Some(client_id)).apply(world);
         }
     }
 
@@ -196,18 +196,18 @@ impl<E: EventPack> EventQueueConnectorServer<E>
         &self,
         world      : &mut World,
         counter    : u32,
-        session_id : SessionId,
+        client_id : ClientId,
         report     : ServerReport<E::ConnectMsg>
     ){
-        syscall(world, (counter, session_id, report), send_connection::<E>);
+        world.syscall((counter, client_id, report), send_connection::<E>);
     }
 
-    pub(crate) fn send_message(&self, world: &mut World, session_id: SessionId, message_event_id: u16, data: Vec<u8>)
+    pub(crate) fn send_message(&self, world: &mut World, client_id: ClientId, message_event_id: u16, data: Vec<u8>)
     {
         let Some(cb) = self.send_messages.get(&message_event_id)
         else { tracing::error!("tried to send message of unregistered message type"); return; };
 
-        cb.call_with((session_id, data)).apply(world);
+        cb.call_with((client_id, data)).apply(world);
     }
 
     pub(crate) fn send_request(&self,

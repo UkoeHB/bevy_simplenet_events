@@ -107,7 +107,7 @@ impl SimplenetClientEventAppExt for App
 {
     fn insert_simplenet_client<E: EventPack>(&mut self, client: Client<EventWrapper<E>>) -> &mut Self
     {
-        if self.world.contains_resource::<EventClientCore<E>>()
+        if self.world().contains_resource::<EventClientCore<E>>()
         {
             panic!("event client was already inserted");
         }

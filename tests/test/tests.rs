@@ -5,7 +5,7 @@ use bevy_simplenet_events::*;
 use bevy_app::*;
 use bevy_ecs::prelude::*;
 use bevy_cobweb::prelude::*;
-use bevy_simplenet::{MessageStatus, RequestToken, SessionId};
+use bevy_simplenet::{MessageStatus, RequestToken, ClientId};
 use enfync::AdoptOrDefault;
 use serde::{Serialize, Deserialize};
 
@@ -76,7 +76,7 @@ fn setup_server(app: &mut App) -> url::Url
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn setup_client(app: &mut App, url: url::Url, client_id: SessionId, connect_msg: DemoConnectMsg)
+fn setup_client(app: &mut App, url: url::Url, client_id: ClientId, connect_msg: DemoConnectMsg)
 {
     tracing::info!(client_id, "launching client...");
 
@@ -166,13 +166,13 @@ fn num_response_events_client<Req: SimplenetEvent, Resp: SimplenetEvent>(
 //-------------------------------------------------------------------------------------------------------------------
 
 fn check_server_received_message<T: SimplenetEvent + Eq + PartialEq>(
-    In((client_id, msg)) : In<(SessionId, T)>,
+    In((client_id, msg)) : In<(ClientId, T)>,
     reader               : ServerMessageReader<DemoChannel, T>
 ) -> bool
 {
-    for (session_id, client_msg) in reader.iter()
+    for (sender_id, client_msg) in reader.iter()
     {
-        if client_id != session_id { continue; }
+        if sender_id != client_id { continue; }
         if msg == *client_msg { return true; }
     }
 
@@ -199,7 +199,7 @@ fn check_client_received_message<T: SimplenetEvent + Eq + PartialEq>(
 //-------------------------------------------------------------------------------------------------------------------
 
 fn get_server_requests<Req: SimplenetEvent + Eq + PartialEq, Resp: SimplenetEvent + Eq + PartialEq>(
-    In(client_id) : In<SessionId>,
+    In(client_id) : In<ClientId>,
     mut reader    : ServerRequestSource<DemoChannel, Req, Resp>
 ) -> Vec<(RequestToken, Req)>
 {
@@ -232,15 +232,15 @@ fn check_client_received_response<Req: SimplenetEvent + Eq + PartialEq, Resp: Si
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn check_client_connected_on_server(In(client_id): In<SessionId>, reader: ServerConnectionReader<DemoChannel>) -> bool
+fn check_client_connected_on_server(In(client_id): In<ClientId>, reader: ServerConnectionReader<DemoChannel>) -> bool
 {
-    for (session_id, connection) in reader.iter()
+    for (connected_id, connection) in reader.iter()
     {
         match connection
         {
             DemoServerReport::Connected(..) =>
             {
-                if session_id == client_id
+                if connected_id == client_id
                 {
                     return true;
                 }
@@ -297,7 +297,7 @@ fn send_client_request<Req: SimplenetEvent>(In(request): In<Req>, client: EventC
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn send_server_message<T: SimplenetEvent>(In((client_id, msg)): In<(SessionId, T)>, server: EventServer<DemoChannel>)
+fn send_server_message<T: SimplenetEvent>(In((client_id, msg)): In<(ClientId, T)>, server: EventServer<DemoChannel>)
 {
     server.send(client_id, msg);
 }
@@ -335,9 +335,9 @@ fn send_server_reject<Req: SimplenetEvent, Resp: SimplenetEvent>(
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
-fn disconnect_client_on_server(In(session_id): In<SessionId>, server: EventServer<DemoChannel>)
+fn disconnect_client_on_server(In(client_id): In<ClientId>, server: EventServer<DemoChannel>)
 {
-    server.close_session(session_id, None);
+    server.disconnect_client(client_id, None);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -375,11 +375,11 @@ fn client_connection()
     server_app.update();
     client_app.update();
 
-    assert_eq!(server_app.world.syscall((), num_connection_events_server), 1);
-    assert_eq!(client_app.world.syscall((), num_connection_events_client), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
+    assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    assert!(server_app.world.syscall(client_id, check_client_connected_on_server));
-    assert!(client_app.world.syscall((), check_client_connected_on_client));
+    assert!(server_app.world_mut().syscall(client_id, check_client_connected_on_server));
+    assert!(client_app.world_mut().syscall((), check_client_connected_on_client));
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -413,12 +413,12 @@ fn server_multisystem_reader()
     client_app2.update();
 
     //note: must read connection events before sending is allowed
-    assert_eq!(server_app.world.syscall((), num_connection_events_server), 2);
-    assert_eq!(client_app1.world.syscall((), num_connection_events_client), 1);
-    assert_eq!(client_app2.world.syscall((), num_connection_events_client), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 2);
+    assert_eq!(client_app1.world_mut().syscall((), num_connection_events_client), 1);
+    assert_eq!(client_app2.world_mut().syscall((), num_connection_events_client), 1);
 
-    client_app1.world.syscall(DemoMsg1(10), send_client_message::<DemoMsg1>);
-    client_app1.world.syscall(DemoMsg2(20), send_client_message::<DemoMsg2>);
+    client_app1.world_mut().syscall(DemoMsg1(10), send_client_message::<DemoMsg1>);
+    client_app1.world_mut().syscall(DemoMsg2(20), send_client_message::<DemoMsg2>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -426,11 +426,11 @@ fn server_multisystem_reader()
     client_app1.update();
     client_app2.update();
 
-    assert_eq!(server_app.world.syscall((), num_message_events_server::<DemoMsg1>), 1);
-    assert_eq!(server_app.world.syscall((), num_message_events_server::<DemoMsg2>), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_message_events_server::<DemoMsg1>), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_message_events_server::<DemoMsg2>), 1);
 
-    assert!(server_app.world.syscall((client_id1, DemoMsg1(10)), check_server_received_message::<DemoMsg1>));
-    assert!(server_app.world.syscall((client_id1, DemoMsg2(20)), check_server_received_message::<DemoMsg2>));
+    assert!(server_app.world_mut().syscall((client_id1, DemoMsg1(10)), check_server_received_message::<DemoMsg1>));
+    assert!(server_app.world_mut().syscall((client_id1, DemoMsg2(20)), check_server_received_message::<DemoMsg2>));
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -464,12 +464,12 @@ fn client_multisystem_reader()
     client_app2.update();
 
     //note: must read connection events before sending is allowed
-    assert_eq!(server_app.world.syscall((), num_connection_events_server), 2);
-    assert_eq!(client_app1.world.syscall((), num_connection_events_client), 1);
-    assert_eq!(client_app2.world.syscall((), num_connection_events_client), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 2);
+    assert_eq!(client_app1.world_mut().syscall((), num_connection_events_client), 1);
+    assert_eq!(client_app2.world_mut().syscall((), num_connection_events_client), 1);
 
-    server_app.world.syscall((client_id1, DemoMsg1(10)), send_server_message::<DemoMsg1>);
-    server_app.world.syscall((client_id1, DemoMsg2(20)), send_server_message::<DemoMsg2>);
+    server_app.world_mut().syscall((client_id1, DemoMsg1(10)), send_server_message::<DemoMsg1>);
+    server_app.world_mut().syscall((client_id1, DemoMsg2(20)), send_server_message::<DemoMsg2>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -477,13 +477,13 @@ fn client_multisystem_reader()
     client_app1.update();
     client_app2.update();
 
-    assert_eq!(client_app1.world.syscall((), num_message_events_client::<DemoMsg1>), 1);
-    assert_eq!(client_app1.world.syscall((), num_message_events_client::<DemoMsg2>), 1);
-    assert_eq!(client_app2.world.syscall((), num_message_events_client::<DemoMsg1>), 0);
-    assert_eq!(client_app2.world.syscall((), num_message_events_client::<DemoMsg2>), 0);
+    assert_eq!(client_app1.world_mut().syscall((), num_message_events_client::<DemoMsg1>), 1);
+    assert_eq!(client_app1.world_mut().syscall((), num_message_events_client::<DemoMsg2>), 1);
+    assert_eq!(client_app2.world_mut().syscall((), num_message_events_client::<DemoMsg1>), 0);
+    assert_eq!(client_app2.world_mut().syscall((), num_message_events_client::<DemoMsg2>), 0);
 
-    assert!(client_app1.world.syscall(DemoMsg1(10), check_client_received_message::<DemoMsg1>));
-    assert!(client_app1.world.syscall(DemoMsg2(20), check_client_received_message::<DemoMsg2>));
+    assert!(client_app1.world_mut().syscall(DemoMsg1(10), check_client_received_message::<DemoMsg1>));
+    assert!(client_app1.world_mut().syscall(DemoMsg2(20), check_client_received_message::<DemoMsg2>));
 }
 
 
@@ -522,33 +522,33 @@ fn client_request()
     client_app.update();
 
     //note: must read connection events before sending is allowed
-    assert_eq!(server_app.world.syscall((), num_connection_events_server), 1);
-    assert_eq!(client_app.world.syscall((), num_connection_events_client), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
+    assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    client_app.world.syscall(DemoRequest1(1), send_client_request::<DemoRequest1>);
+    client_app.world_mut().syscall(DemoRequest1(1), send_client_request::<DemoRequest1>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     server_app.update();
     client_app.update();
 
-    let mut reqs = server_app.world.syscall(client_id, get_server_requests::<DemoRequest1, DemoResponse1>);
+    let mut reqs = server_app.world_mut().syscall(client_id, get_server_requests::<DemoRequest1, DemoResponse1>);
     let (token, req) = reqs.pop().unwrap();
     let request_id = token.request_id();
     assert_eq!(req, DemoRequest1(1));
 
-    server_app.world.syscall((token, DemoResponse1(2)), send_server_response::<DemoRequest1, DemoResponse1>);
+    server_app.world_mut().syscall((token, DemoResponse1(2)), send_server_response::<DemoRequest1, DemoResponse1>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     server_app.update();
     client_app.update();
 
-    assert!(client_app.world.syscall(
+    assert!(client_app.world_mut().syscall(
             ServerResponse::Response(DemoResponse1(2), request_id),
             check_client_received_response::<DemoRequest1, DemoResponse1>
         ));
-    assert!(client_app.world.syscall(
+    assert!(client_app.world_mut().syscall(
             ServerResponse::Response(DemoResponse1(2), request_id),
             check_client_received_response::<DemoRequest1, DemoResponse1>
         ));
@@ -589,18 +589,18 @@ fn client_request_acked_rejected()
     client_app.update();
 
     //note: must read connection events before sending is allowed
-    assert_eq!(server_app.world.syscall((), num_connection_events_server), 1);
-    assert_eq!(client_app.world.syscall((), num_connection_events_client), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
+    assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    client_app.world.syscall(DemoRequest2(2), send_client_request::<DemoRequest2>);
-    client_app.world.syscall(DemoRequest2(22), send_client_request::<DemoRequest2>);
+    client_app.world_mut().syscall(DemoRequest2(2), send_client_request::<DemoRequest2>);
+    client_app.world_mut().syscall(DemoRequest2(22), send_client_request::<DemoRequest2>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     server_app.update();
     client_app.update();
 
-    let mut requests = server_app.world.syscall(client_id, get_server_requests::<DemoRequest2, ()>);
+    let mut requests = server_app.world_mut().syscall(client_id, get_server_requests::<DemoRequest2, ()>);
     let (token1, req1) = requests.pop().unwrap();
     let (token2, req2) = requests.pop().unwrap();
     let request_id1 = token1.request_id();
@@ -608,19 +608,19 @@ fn client_request_acked_rejected()
     let mut reqs = [req1, req2]; reqs.sort();
     assert_eq!(reqs, [DemoRequest2(2), DemoRequest2(22)]);
 
-    server_app.world.syscall(token1, send_server_ack::<DemoRequest2, ()>);
-    server_app.world.syscall(token2, send_server_reject::<DemoRequest2, ()>);
+    server_app.world_mut().syscall(token1, send_server_ack::<DemoRequest2, ()>);
+    server_app.world_mut().syscall(token2, send_server_reject::<DemoRequest2, ()>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     server_app.update();
     client_app.update();
 
-    assert!(client_app.world.syscall(
+    assert!(client_app.world_mut().syscall(
             ServerResponse::Ack(request_id1),
             check_client_received_response::<DemoRequest2, ()>
         ));
-    assert!(client_app.world.syscall(
+    assert!(client_app.world_mut().syscall(
             ServerResponse::Reject(request_id2),
             check_client_received_response::<DemoRequest2, ()>
         ));
@@ -646,21 +646,21 @@ fn client_server_shared_app()
 
     shared_app.update();
 
-    assert_eq!(shared_app.world.syscall((), num_connection_events_server), 1);
-    assert_eq!(shared_app.world.syscall((), num_connection_events_client), 1);
+    assert_eq!(shared_app.world_mut().syscall((), num_connection_events_server), 1);
+    assert_eq!(shared_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    assert!(shared_app.world.syscall(client_id, check_client_connected_on_server));
-    assert!(shared_app.world.syscall((), check_client_connected_on_client));
+    assert!(shared_app.world_mut().syscall(client_id, check_client_connected_on_server));
+    assert!(shared_app.world_mut().syscall((), check_client_connected_on_client));
 
-    shared_app.world.syscall((client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
-    shared_app.world.syscall(DemoMsg1(11), send_client_message::<DemoMsg1>);
+    shared_app.world_mut().syscall((client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
+    shared_app.world_mut().syscall(DemoMsg1(11), send_client_message::<DemoMsg1>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     shared_app.update();
 
-    assert!(shared_app.world.syscall((client_id, DemoMsg1(11)), check_server_received_message::<DemoMsg1>));
-    assert!(shared_app.world.syscall(DemoMsg1(1), check_client_received_message::<DemoMsg1>));
+    assert!(shared_app.world_mut().syscall((client_id, DemoMsg1(11)), check_server_received_message::<DemoMsg1>));
+    assert!(shared_app.world_mut().syscall(DemoMsg1(1), check_client_received_message::<DemoMsg1>));
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -694,23 +694,23 @@ fn client_drops_old_server_msg()
     server_app.update();
     client_app.update();
 
-    assert_eq!(server_app.world.syscall((), num_connection_events_server), 1);
-    assert_eq!(client_app.world.syscall((), num_connection_events_client), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
+    assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    assert!(server_app.world.syscall(client_id, check_client_connected_on_server));
-    assert!(client_app.world.syscall((), check_client_connected_on_client));
+    assert!(server_app.world_mut().syscall(client_id, check_client_connected_on_server));
+    assert!(client_app.world_mut().syscall((), check_client_connected_on_client));
 
-    server_app.world.syscall((client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
+    server_app.world_mut().syscall((client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
     std::thread::sleep(std::time::Duration::from_millis(50));
-    server_app.world.syscall(client_id, disconnect_client_on_server);
+    server_app.world_mut().syscall(client_id, disconnect_client_on_server);
 
     std::thread::sleep(std::time::Duration::from_millis(200));
 
     server_app.update();
     client_app.update();
 
-    assert_eq!(client_app.world.syscall((), num_connection_events_client), 2);
-    assert_eq!(client_app.world.syscall((), num_message_events_client::<DemoMsg1>), 0);
+    assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 2);
+    assert_eq!(client_app.world_mut().syscall((), num_message_events_client::<DemoMsg1>), 0);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -744,40 +744,40 @@ fn client_loses_old_server_response()
     server_app.update();
     client_app.update();
 
-    assert_eq!(server_app.world.syscall((), num_connection_events_server), 1);
-    assert_eq!(client_app.world.syscall((), num_connection_events_client), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
+    assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    client_app.world.syscall(DemoRequest1(1), send_client_request::<DemoRequest1>);
-    client_app.world.syscall(DemoRequest1(2), send_client_request::<DemoRequest1>);
+    client_app.world_mut().syscall(DemoRequest1(1), send_client_request::<DemoRequest1>);
+    client_app.world_mut().syscall(DemoRequest1(2), send_client_request::<DemoRequest1>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     server_app.update();
 
-    let mut requests = server_app.world.syscall(client_id, get_server_requests::<DemoRequest1, DemoResponse1>);
+    let mut requests = server_app.world_mut().syscall(client_id, get_server_requests::<DemoRequest1, DemoResponse1>);
     let (token1, _req1) = requests.pop().unwrap();
     let (token2, _req2) = requests.pop().unwrap();
     let request_id1 = token1.request_id();
     let request_id2 = token2.request_id();
 
-    server_app.world.syscall((token1, DemoResponse1(1)), send_server_response::<DemoRequest1, DemoResponse1>);
-    server_app.world.syscall(token2, send_server_ack::<DemoRequest1, DemoResponse1>);
+    server_app.world_mut().syscall((token1, DemoResponse1(1)), send_server_response::<DemoRequest1, DemoResponse1>);
+    server_app.world_mut().syscall(token2, send_server_ack::<DemoRequest1, DemoResponse1>);
     std::thread::sleep(std::time::Duration::from_millis(50));
-    server_app.world.syscall(client_id, disconnect_client_on_server);
+    server_app.world_mut().syscall(client_id, disconnect_client_on_server);
 
     std::thread::sleep(std::time::Duration::from_millis(200));
 
     server_app.update();
     client_app.update();
 
-    assert_eq!(client_app.world.syscall((), num_connection_events_client), 2);
-    assert_eq!(client_app.world.syscall((), num_response_events_client::<DemoRequest1, DemoResponse1>), 2);
+    assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 2);
+    assert_eq!(client_app.world_mut().syscall((), num_response_events_client::<DemoRequest1, DemoResponse1>), 2);
 
-    assert!(client_app.world.syscall(
+    assert!(client_app.world_mut().syscall(
             ServerResponse::ResponseLost(request_id1),
             check_client_received_response::<DemoRequest1, DemoResponse1>
         ));
-    assert!(client_app.world.syscall(
+    assert!(client_app.world_mut().syscall(
             ServerResponse::ResponseLost(request_id2),
             check_client_received_response::<DemoRequest1, DemoResponse1>
         ));
@@ -805,21 +805,21 @@ fn client_send_blocked_until_read_connect()
     server_app.update();
     client_app.update();
 
-    assert!(!client_app.world.syscall(DemoMsg1(1), try_send_client_message::<DemoMsg1>));
+    assert!(!client_app.world_mut().syscall(DemoMsg1(1), try_send_client_message::<DemoMsg1>));
 
-    assert_eq!(server_app.world.syscall((), num_connection_events_server), 1);
-    assert_eq!(client_app.world.syscall((), num_connection_events_client), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
+    assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    assert!(client_app.world.syscall(DemoMsg1(10), try_send_client_message::<DemoMsg1>));
+    assert!(client_app.world_mut().syscall(DemoMsg1(10), try_send_client_message::<DemoMsg1>));
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     server_app.update();
     client_app.update();
 
-    assert_eq!(server_app.world.syscall((), num_message_events_server::<DemoMsg1>), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_message_events_server::<DemoMsg1>), 1);
 
-    assert!(server_app.world.syscall((client_id, DemoMsg1(10)), check_server_received_message::<DemoMsg1>));
+    assert!(server_app.world_mut().syscall((client_id, DemoMsg1(10)), check_server_received_message::<DemoMsg1>));
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -853,22 +853,22 @@ fn server_drops_old_client_msg()
     server_app.update();
     client_app.update();
 
-    assert_eq!(server_app.world.syscall((), num_connection_events_server), 1);
-    assert_eq!(client_app.world.syscall((), num_connection_events_client), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
+    assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    client_app.world.syscall(DemoMsg1(1), send_client_message::<DemoMsg1>);
-    client_app.world.syscall(DemoRequest1(11), send_client_request::<DemoRequest1>);
+    client_app.world_mut().syscall(DemoMsg1(1), send_client_message::<DemoMsg1>);
+    client_app.world_mut().syscall(DemoRequest1(11), send_client_request::<DemoRequest1>);
     std::thread::sleep(std::time::Duration::from_millis(50));
-    client_app.world.syscall((), disconnect_client_on_client);
+    client_app.world_mut().syscall((), disconnect_client_on_client);
 
     std::thread::sleep(std::time::Duration::from_millis(200));
 
     server_app.update();
     client_app.update();
 
-    assert_eq!(server_app.world.syscall((), num_connection_events_server), 1);
-    assert_eq!(server_app.world.syscall((), num_message_events_server::<DemoMsg1>), 0);
-    assert_eq!(server_app.world.syscall((), num_request_events_server::<DemoRequest1, DemoResponse1>), 0);
+    assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_message_events_server::<DemoMsg1>), 0);
+    assert_eq!(server_app.world_mut().syscall((), num_request_events_server::<DemoRequest1, DemoResponse1>), 0);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -901,21 +901,21 @@ fn server_send_blocked_until_read_connect()
     server_app.update();
     client_app.update();
 
-    server_app.world.syscall((client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
+    server_app.world_mut().syscall((client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
 
-    assert_eq!(server_app.world.syscall((), num_connection_events_server), 1);
-    assert_eq!(client_app.world.syscall((), num_connection_events_client), 1);
+    assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
+    assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    server_app.world.syscall((client_id, DemoMsg1(10)), send_server_message::<DemoMsg1>);
+    server_app.world_mut().syscall((client_id, DemoMsg1(10)), send_server_message::<DemoMsg1>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     server_app.update();
     client_app.update();
 
-    assert_eq!(client_app.world.syscall((), num_message_events_client::<DemoMsg1>), 1);
+    assert_eq!(client_app.world_mut().syscall((), num_message_events_client::<DemoMsg1>), 1);
 
-    assert!(client_app.world.syscall(DemoMsg1(10), check_client_received_message::<DemoMsg1>));
+    assert!(client_app.world_mut().syscall(DemoMsg1(10), check_client_received_message::<DemoMsg1>));
 }
 
 //-------------------------------------------------------------------------------------------------------------------
