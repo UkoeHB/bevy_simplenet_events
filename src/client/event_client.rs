@@ -1,12 +1,8 @@
-//local shortcuts
-use crate::*;
-
-//third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 use bevy_simplenet::{MessageSignal, RequestSignal};
 
-//standard shortcuts
+use crate::*;
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -14,8 +10,8 @@ use bevy_simplenet::{MessageSignal, RequestSignal};
 #[derive(SystemParam)]
 pub struct EventClient<'w, E: EventPack>
 {
-    client   : Res<'w, EventClientCore<E>>,
-    registry : Res<'w, EventRegistry<E>>,
+    client: Res<'w, EventClientCore<E>>,
+    registry: Res<'w, EventRegistry<E>>,
 }
 
 impl<'w, E: EventPack> EventClient<'w, E>

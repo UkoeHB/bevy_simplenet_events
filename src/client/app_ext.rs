@@ -1,80 +1,102 @@
-//local shortcuts
-use crate::*;
-
-//third-party shortcuts
 use bevy_app::{App, First};
 use bevy_ecs::prelude::*;
 use bevy_simplenet::{Client, ClientEvent, ClientReport};
 
-//standard shortcuts
+use crate::*;
 
-
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 type InnerClientEvent = ClientEvent<InternalEvent, InternalEvent>;
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn drain_client<E: EventPack>(world: &mut World)
 {
     let mut client = world.remove_resource::<EventClientCore<E>>().unwrap();
-    let queues = world.remove_resource::<EventQueueConnectorClient<E>>().unwrap();
+    let queues = world
+        .remove_resource::<EventQueueConnectorClient<E>>()
+        .unwrap();
 
     // clear existing events
     queues.clear_all(world);
 
     // drain events
-    while let Some((counter, event)) = client.next()
-    {
-        match event
-        {
-            InnerClientEvent::Report(report) =>
-            {
-                match &report
-                {
+    while let Some((counter, event)) = client.next() {
+        match event {
+            InnerClientEvent::Report(report) => {
+                match &report {
                     ClientReport::Connected => (),
-                    _                       => queues.handle_disconnect(world),  //all other variants are disconnect types
+                    _ => queues.handle_disconnect(world), //all other variants are disconnect types
                 }
 
                 queues.send_connection(world, counter, report);
             }
-            InnerClientEvent::Msg(message) =>
-            {
+            InnerClientEvent::Msg(message) => {
                 queues.send_message(world, message.id, message.data);
             }
-            InnerClientEvent::Response(response, request_id) =>
-            {
-                let (request_event_id, response_event_id) = client.remove_request(request_id).expect("request id missing");
-                if response.id != response_event_id { panic!("received invalid request id"); }
+            InnerClientEvent::Response(response, request_id) => {
+                let (request_event_id, response_event_id) = client
+                    .remove_request(request_id)
+                    .expect("request id missing");
+                if response.id != response_event_id {
+                    panic!("received invalid request id");
+                }
 
-                queues.send_response(world,
+                queues.send_response(
+                    world,
                     request_event_id,
                     response_event_id,
                     request_id,
-                    PendingResponseData::Response(response.data)
+                    PendingResponseData::Response(response.data),
                 );
             }
-            InnerClientEvent::Ack(request_id) =>
-            {
-                let (request_event_id, response_event_id) = client.remove_request(request_id).expect("request id missing");
-                queues.send_response(world, request_event_id, response_event_id, request_id, PendingResponseData::Ack);
+            InnerClientEvent::Ack(request_id) => {
+                let (request_event_id, response_event_id) = client
+                    .remove_request(request_id)
+                    .expect("request id missing");
+                queues.send_response(
+                    world,
+                    request_event_id,
+                    response_event_id,
+                    request_id,
+                    PendingResponseData::Ack,
+                );
             }
-            InnerClientEvent::Reject(request_id) =>
-            {
-                let (request_event_id, response_event_id) = client.remove_request(request_id).expect("request id missing");
-                queues.send_response(world, request_event_id, response_event_id, request_id, PendingResponseData::Reject);
+            InnerClientEvent::Reject(request_id) => {
+                let (request_event_id, response_event_id) = client
+                    .remove_request(request_id)
+                    .expect("request id missing");
+                queues.send_response(
+                    world,
+                    request_event_id,
+                    response_event_id,
+                    request_id,
+                    PendingResponseData::Reject,
+                );
             }
-            InnerClientEvent::SendFailed(request_id) =>
-            {
-                let (request_event_id, response_event_id) = client.remove_request(request_id).expect("request id missing");
-                queues.send_response(world, request_event_id, response_event_id, request_id, PendingResponseData::SendFailed);
+            InnerClientEvent::SendFailed(request_id) => {
+                let (request_event_id, response_event_id) = client
+                    .remove_request(request_id)
+                    .expect("request id missing");
+                queues.send_response(
+                    world,
+                    request_event_id,
+                    response_event_id,
+                    request_id,
+                    PendingResponseData::SendFailed,
+                );
             }
-            InnerClientEvent::ResponseLost(request_id)  =>
-            {
-                let (request_event_id, response_event_id) = client.remove_request(request_id).expect("request id missing");
-                queues.send_response(world, request_event_id, response_event_id, request_id, PendingResponseData::ResponseLost);
+            InnerClientEvent::ResponseLost(request_id) => {
+                let (request_event_id, response_event_id) = client
+                    .remove_request(request_id)
+                    .expect("request id missing");
+                queues.send_response(
+                    world,
+                    request_event_id,
+                    response_event_id,
+                    request_id,
+                    PendingResponseData::ResponseLost,
+                );
             }
         }
     }
@@ -83,7 +105,6 @@ fn drain_client<E: EventPack>(world: &mut World)
     world.insert_resource(queues);
 }
 
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 pub enum PendingResponseData
@@ -107,8 +128,7 @@ impl SimplenetClientEventAppExt for App
 {
     fn insert_simplenet_client<E: EventPack>(&mut self, client: Client<EventWrapper<E>>) -> &mut Self
     {
-        if self.world().contains_resource::<EventClientCore<E>>()
-        {
+        if self.world().contains_resource::<EventClientCore<E>>() {
             panic!("event client was already inserted");
         }
 

@@ -1,13 +1,8 @@
-//local shortcuts
-use crate::*;
-
-//third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
-use bevy_simplenet::{CloseFrame, RequestToken, ClientId};
+use bevy_simplenet::{ClientId, CloseFrame, RequestToken};
 
-//standard shortcuts
-
+use crate::*;
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -15,8 +10,8 @@ use bevy_simplenet::{CloseFrame, RequestToken, ClientId};
 #[derive(SystemParam)]
 pub struct EventServer<'w, E: EventPack>
 {
-    server   : Res<'w, EventServerCore<E>>,
-    registry : Res<'w, EventRegistry<E>>,
+    server: Res<'w, EventServerCore<E>>,
+    registry: Res<'w, EventRegistry<E>>,
 }
 
 impl<'w, E: EventPack> EventServer<'w, E>

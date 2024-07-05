@@ -1,13 +1,8 @@
-//local shortcuts
-use crate::*;
-
-//third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
-use bevy_simplenet::{RequestToken, ServerReport, ClientId};
+use bevy_simplenet::{ClientId, RequestToken, ServerReport};
 
-//standard shortcuts
-
+use crate::*;
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -15,8 +10,8 @@ use bevy_simplenet::{RequestToken, ServerReport, ClientId};
 #[derive(SystemParam)]
 pub struct ServerConnectionReader<'w, E: EventPack>
 {
-    server : Res<'w, EventServerCore<E>>,
-    events : Res<'w, ServerConnectionQueue<E>>,
+    server: Res<'w, EventServerCore<E>>,
+    events: Res<'w, ServerConnectionQueue<E>>,
 }
 
 impl<'w, E: EventPack> ServerConnectionReader<'w, E>
@@ -24,14 +19,10 @@ impl<'w, E: EventPack> ServerConnectionReader<'w, E>
     /// Iterates the available connection reports.
     pub fn iter(&self) -> impl Iterator<Item = (ClientId, &ServerReport<E::ConnectMsg>)> + '_
     {
-        self.events
-            .iter()
-            .map(|(counter, id, report)|
-                {
-                    self.server.try_clear_pending_connect(*id, *counter);
-                    (*id, report)
-                }
-            )
+        self.events.iter().map(|(counter, id, report)| {
+            self.server.try_clear_pending_connect(*id, *counter);
+            (*id, report)
+        })
     }
 }
 
@@ -49,9 +40,7 @@ impl<'w, E: EventPack, T: SimplenetEvent> ServerMessageReader<'w, E, T>
     /// Iterates the available client messages.
     pub fn iter(&self) -> impl Iterator<Item = (ClientId, &T)> + '_
     {
-        self.events
-            .iter()
-            .map(|(id, report)| (*id, report))
+        self.events.iter().map(|(id, report)| (*id, report))
     }
 }
 

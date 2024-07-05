@@ -1,12 +1,9 @@
-//local shortcuts
-use crate::*;
-
-//third-party shortcuts
-use bevy_ecs::prelude::*;
-use bevy_simplenet::{RequestToken, ServerReport, ClientId};
-
-//standard shortcuts
 use std::marker::PhantomData;
+
+use bevy_ecs::prelude::*;
+use bevy_simplenet::{ClientId, RequestToken, ServerReport};
+
+use crate::*;
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -38,7 +35,10 @@ impl<E: EventPack> ServerConnectionQueue<E>
 
 impl<E: EventPack> Default for ServerConnectionQueue<E>
 {
-    fn default() -> Self { Self{ queue: Vec::default() } }
+    fn default() -> Self
+    {
+        Self { queue: Vec::default() }
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -61,17 +61,13 @@ impl<E: EventPack, T: SimplenetEvent> ServerMessageQueue<E, T>
     {
         self.queue
             .iter_mut()
-            .filter(
-                |i|
-                {
-                    match i
-                    {
-                        Some(i) => i.0 == client_id,
-                        None    => false,
-                    }
-                }
-            )
-            .for_each(|i| { *i = None; });
+            .filter(|i| match i {
+                Some(i) => i.0 == client_id,
+                None => false,
+            })
+            .for_each(|i| {
+                *i = None;
+            });
     }
 
     pub(crate) fn send(&mut self, client_id: ClientId, message: T)
@@ -81,15 +77,16 @@ impl<E: EventPack, T: SimplenetEvent> ServerMessageQueue<E, T>
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = &(ClientId, T)> + '_
     {
-        self.queue
-            .iter()
-            .filter_map(|i| i.as_ref())
+        self.queue.iter().filter_map(|i| i.as_ref())
     }
 }
 
 impl<E: EventPack, T: SimplenetEvent> Default for ServerMessageQueue<E, T>
 {
-    fn default() -> Self { Self{ queue: Vec::default(), phantom: PhantomData::default() } }
+    fn default() -> Self
+    {
+        Self { queue: Vec::default(), phantom: PhantomData::default() }
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -112,17 +109,13 @@ impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ServerRequestQueue
     {
         self.queue
             .iter_mut()
-            .filter(
-                |i|
-                {
-                    match i
-                    {
-                        Some(i) => i.0.client_id() == client_id,
-                        None    => false,
-                    }
-                }
-            )
-            .for_each(|i| { *i = None; });
+            .filter(|i| match i {
+                Some(i) => i.0.client_id() == client_id,
+                None => false,
+            })
+            .for_each(|i| {
+                *i = None;
+            });
     }
 
     pub(crate) fn send(&mut self, request_token: RequestToken, request: Req)
@@ -138,7 +131,10 @@ impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ServerRequestQueue
 
 impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> Default for ServerRequestQueue<E, Req, Resp>
 {
-    fn default() -> Self { Self{ queue: Vec::default(), phantom: PhantomData::default() } }
+    fn default() -> Self
+    {
+        Self { queue: Vec::default(), phantom: PhantomData::default() }
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------

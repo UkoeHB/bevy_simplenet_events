@@ -1,13 +1,8 @@
-//local shortcuts
-use crate::*;
-
-//third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 use bevy_simplenet::ClientReport;
 
-//standard shortcuts
-
+use crate::*;
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -15,8 +10,8 @@ use bevy_simplenet::ClientReport;
 #[derive(SystemParam)]
 pub struct ClientConnectionReader<'w, E: EventPack>
 {
-    client : Res<'w, EventClientCore<E>>,
-    events : Res<'w, ClientConnectionQueue<E>>,
+    client: Res<'w, EventClientCore<E>>,
+    events: Res<'w, ClientConnectionQueue<E>>,
 }
 
 impl<'w, E: EventPack> ClientConnectionReader<'w, E>
@@ -24,14 +19,10 @@ impl<'w, E: EventPack> ClientConnectionReader<'w, E>
     /// Iterates the available connection reports.
     pub fn iter(&self) -> impl Iterator<Item = &ClientReport> + '_
     {
-        self.events
-            .iter()
-            .map(|(counter, report)|
-                {
-                    self.client.try_clear_pending_connect(*counter);
-                    report
-                }
-            )
+        self.events.iter().map(|(counter, report)| {
+            self.client.try_clear_pending_connect(*counter);
+            report
+        })
     }
 }
 

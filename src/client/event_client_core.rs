@@ -1,16 +1,13 @@
-//local shortcuts
-use crate::*;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
-//third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_simplenet::*;
 use bincode::Options;
 use crossbeam::channel::{Receiver, Sender};
 
-//standard shortcuts
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use crate::*;
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -41,13 +38,13 @@ impl<E: EventPack> EventClientCore<E>
     pub(crate) fn new(client: Client<EventWrapper<E>>) -> Self
     {
         let (request_sender, request_receiver) = crossbeam::channel::unbounded();
-        Self{
-            inner           : client,
-            counter         : 0u32,
-            pending_connect : Arc::new(AtomicU64::new(u64::MAX)),
+        Self {
+            inner: client,
+            counter: 0u32,
+            pending_connect: Arc::new(AtomicU64::new(u64::MAX)),
             request_sender,
             request_receiver,
-            request_map     : HashMap::default(),
+            request_map: HashMap::default(),
         }
     }
 
@@ -55,17 +52,20 @@ impl<E: EventPack> EventClientCore<E>
     pub(crate) fn pending_connect(&self) -> Option<u32>
     {
         let counter = self.pending_connect.load(Ordering::Relaxed);
-        if counter > u32::MAX as u64 { return None; }
+        if counter > u32::MAX as u64 {
+            return None;
+        }
         Some(counter as u32)
     }
 
     /// Sets a new pending connect counter.
     pub(crate) fn set_pending_connect(&self, new: Option<u32>)
     {
-        match new
-        {
-            Some(counter) => self.pending_connect.store(counter as u64, Ordering::Relaxed),
-            None          => self.pending_connect.store(u64::MAX, Ordering::Relaxed),
+        match new {
+            Some(counter) => self
+                .pending_connect
+                .store(counter as u64, Ordering::Relaxed),
+            None => self.pending_connect.store(u64::MAX, Ordering::Relaxed),
         }
     }
 
@@ -74,11 +74,10 @@ impl<E: EventPack> EventClientCore<E>
     /// Does nothing if the client is not connected.
     pub(crate) fn try_clear_pending_connect(&self, counter: u32)
     {
-        // RACE CONDITION SAFETY: This conditional races with setting the new value. We expect that new counters will
-        // only be set once per tick in a system with full access to this struct, so this method can only race with
-        // itself which is harmless.
-        if Some(counter) == self.pending_connect()
-        {
+        // RACE CONDITION SAFETY: This conditional races with setting the new value. We expect that new counters
+        // will only be set once per tick in a system with full access to this struct, so this method can
+        // only race with itself which is harmless.
+        if Some(counter) == self.pending_connect() {
             self.set_pending_connect(None);
         }
     }
@@ -86,47 +85,60 @@ impl<E: EventPack> EventClientCore<E>
     /// Sends a message to the server.
     pub(crate) fn send<T: SimplenetEvent>(&self, registry: &EventRegistry<E>, message: T) -> MessageSignal
     {
-        if self.pending_connect().is_some()
-        {
+        if self.pending_connect().is_some() {
             tracing::warn!("dropping client message because there is a pending connect event");
             return MessageSignal::new(MessageStatus::Failed);
         };
 
-        let Some(message_event_id) = registry.get_message_id::<T>()
-        else
-        {
+        let Some(message_event_id) = registry.get_message_id::<T>() else {
             tracing::error!("client message type is not registered");
             return MessageSignal::new(MessageStatus::Failed);
         };
 
-        let Ok(data) = bincode::DefaultOptions::new().serialize(&message)
-        else
-        {
+        let Ok(data) = bincode::DefaultOptions::new().serialize(&message) else {
             tracing::error!("failed serializing client message");
             return MessageSignal::new(MessageStatus::Failed);
         };
 
-        self.inner.send(InternalEvent{ id: message_event_id, data })
+        self.inner
+            .send(InternalEvent { id: message_event_id, data })
     }
 
     /// Sends a request to the server.
-    pub(crate) fn request<Req: SimplenetEvent>(&self, registry: &EventRegistry<E>, request: Req) -> Result<RequestSignal, ()>
+    pub(crate) fn request<Req: SimplenetEvent>(
+        &self,
+        registry: &EventRegistry<E>,
+        request: Req,
+    ) -> Result<RequestSignal, ()>
     {
-        if self.pending_connect().is_some()
-        { tracing::warn!("dropping client request because there is a pending connect event"); return Err(()); };
+        if self.pending_connect().is_some() {
+            tracing::warn!("dropping client request because there is a pending connect event");
+            return Err(());
+        };
 
-        let Some(request_event_id) = registry.get_request_id::<Req>()
-        else { tracing::error!("client request type is not registered"); return Err(()); };
-        let Some(response_event_id) = registry.get_response_id_from_request::<Req>()
-        else { tracing::error!("no response type registered for the given client request type"); return Err(()); };
+        let Some(request_event_id) = registry.get_request_id::<Req>() else {
+            tracing::error!("client request type is not registered");
+            return Err(());
+        };
+        let Some(response_event_id) = registry.get_response_id_from_request::<Req>() else {
+            tracing::error!("no response type registered for the given client request type");
+            return Err(());
+        };
 
-        let Ok(data) = bincode::DefaultOptions::new().serialize(&request)
-        else { tracing::error!("failed serializing client request"); return Err(()); };
+        let Ok(data) = bincode::DefaultOptions::new().serialize(&request) else {
+            tracing::error!("failed serializing client request");
+            return Err(());
+        };
 
-        let result = self.inner.request(InternalEvent{ id: request_event_id, data });
+        let result = self
+            .inner
+            .request(InternalEvent { id: request_event_id, data });
 
         // use channel since we are immutable
-        if self.request_sender.send((result.id(), (request_event_id, response_event_id))).is_err()
+        if self
+            .request_sender
+            .send((result.id(), (request_event_id, response_event_id)))
+            .is_err()
         {
             tracing::error!("request tracker channel is broken");
         }
@@ -138,8 +150,7 @@ impl<E: EventPack> EventClientCore<E>
     pub(crate) fn remove_request(&mut self, request_id: u64) -> Option<(u16, u16)>
     {
         // drain pending request-tracker entries now that we are mutable
-        while let Ok((request_id, event_ids)) = self.request_receiver.try_recv()
-        {
+        while let Ok((request_id, event_ids)) = self.request_receiver.try_recv() {
             self.request_map.insert(request_id, event_ids);
         }
 
@@ -155,16 +166,16 @@ impl<E: EventPack> EventClientCore<E>
     /// Extracts the next client event.
     pub(crate) fn next(&mut self) -> Option<(u32, ClientEventFrom<EventWrapper<E>>)>
     {
-        let Some(next) = self.inner.next() else { return None; };
+        let Some(next) = self.inner.next() else {
+            return None;
+        };
         self.counter += 1;
 
-        match &next
-        {
-            ClientEventFrom::<EventWrapper<E>>::Report(ClientReport::Connected) =>
-            {
+        match &next {
+            ClientEventFrom::<EventWrapper<E>>::Report(ClientReport::Connected) => {
                 self.set_pending_connect(Some(self.counter));
             }
-            _ => ()
+            _ => (),
         }
 
         Some((self.counter, next))

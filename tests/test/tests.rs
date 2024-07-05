@@ -1,18 +1,11 @@
-//local shortcuts
-use bevy_simplenet_events::*;
-
-//third-party shortcuts
 use bevy_app::*;
-use bevy_ecs::prelude::*;
 use bevy_cobweb::prelude::*;
-use bevy_simplenet::{MessageStatus, RequestToken, ClientId};
+use bevy_ecs::prelude::*;
+use bevy_simplenet::{ClientId, MessageStatus, RequestToken};
+use bevy_simplenet_events::*;
 use enfync::AdoptOrDefault;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-//standard shortcuts
-
-
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 #[derive(SimplenetEvent, Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -53,19 +46,18 @@ fn demo_client_factory() -> bevy_simplenet::ClientFactory<EventWrapper<DemoChann
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn setup_server(app: &mut App) -> url::Url
 {
     tracing::info!("launching server...");
 
     let websocket_server = demo_server_factory().new_server(
-            enfync::builtin::native::TokioHandle::default(),
-            "127.0.0.1:0",
-            bevy_simplenet::AcceptorConfig::Default,
-            bevy_simplenet::Authenticator::None,
-            bevy_simplenet::ServerConfig::default(),
-        );
+        enfync::builtin::native::TokioHandle::default(),
+        "127.0.0.1:0",
+        bevy_simplenet::AcceptorConfig::Default,
+        bevy_simplenet::Authenticator::None,
+        bevy_simplenet::ServerConfig::default(),
+    );
     let url = websocket_server.url();
 
     app.insert_simplenet_server(websocket_server);
@@ -74,42 +66,34 @@ fn setup_server(app: &mut App) -> url::Url
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn setup_client(app: &mut App, url: url::Url, client_id: ClientId, connect_msg: DemoConnectMsg)
 {
     tracing::info!(client_id, "launching client...");
 
     let websocket_client = demo_client_factory().new_client(
-            enfync::builtin::Handle::adopt_or_default(),
-            url,
-            bevy_simplenet::AuthRequest::None{ client_id },
-            bevy_simplenet::ClientConfig::default(),
-            connect_msg
-        );
+        enfync::builtin::Handle::adopt_or_default(),
+        url,
+        bevy_simplenet::AuthRequest::None { client_id },
+        bevy_simplenet::ClientConfig::default(),
+        connect_msg,
+    );
 
     app.insert_simplenet_client(websocket_client);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn setup_event_app(app: &mut App)
 {
-    app
-        .register_simplenet_client_message::<DemoChannel, DemoMsg1>()
+    app.register_simplenet_client_message::<DemoChannel, DemoMsg1>()
         .register_simplenet_client_message::<DemoChannel, DemoMsg2>()
-
         .register_simplenet_server_message::<DemoChannel, DemoMsg1>()
         .register_simplenet_server_message::<DemoChannel, DemoMsg2>()
-
         .register_simplenet_request_response::<DemoChannel, DemoRequest1, DemoResponse1>()
-        .register_simplenet_request_response::<DemoChannel, DemoRequest2, ()>()
-
-        ;
+        .register_simplenet_request_response::<DemoChannel, DemoRequest2, ()>();
 }
 
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 fn num_connection_events_server(reader: ServerConnectionReader<DemoChannel>) -> usize
@@ -118,14 +102,12 @@ fn num_connection_events_server(reader: ServerConnectionReader<DemoChannel>) -> 
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn num_connection_events_client(reader: ClientConnectionReader<DemoChannel>) -> usize
 {
     reader.iter().count()
 }
 
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 fn num_message_events_server<T: SimplenetEvent>(reader: ServerMessageReader<DemoChannel, T>) -> usize
@@ -134,7 +116,6 @@ fn num_message_events_server<T: SimplenetEvent>(reader: ServerMessageReader<Demo
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn num_message_events_client<T: SimplenetEvent>(reader: ClientMessageReader<DemoChannel, T>) -> usize
 {
@@ -142,110 +123,82 @@ fn num_message_events_client<T: SimplenetEvent>(reader: ClientMessageReader<Demo
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 //note that this consumes the requests
 fn num_request_events_server<Req: SimplenetEvent, Resp: SimplenetEvent>(
-    mut source: ServerRequestSource<DemoChannel, Req, Resp>
+    mut source: ServerRequestSource<DemoChannel, Req, Resp>,
 ) -> usize
 {
     source.drain().count()
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn num_response_events_client<Req: SimplenetEvent, Resp: SimplenetEvent>(
-    reader: ClientResponseReader<DemoChannel, Req, Resp>
+    reader: ClientResponseReader<DemoChannel, Req, Resp>,
 ) -> usize
 {
     reader.iter().count()
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn check_server_received_message<T: SimplenetEvent + Eq + PartialEq>(
-    In((client_id, msg)) : In<(ClientId, T)>,
-    reader               : ServerMessageReader<DemoChannel, T>
+    In((client_id, msg)): In<(ClientId, T)>,
+    reader: ServerMessageReader<DemoChannel, T>,
 ) -> bool
 {
-    for (sender_id, client_msg) in reader.iter()
-    {
-        if sender_id != client_id { continue; }
-        if msg == *client_msg { return true; }
+    for (sender_id, client_msg) in reader.iter() {
+        if sender_id != client_id {
+            continue;
+        }
+        if msg == *client_msg {
+            return true;
+        }
     }
 
     false
 }
 
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 fn check_client_received_message<T: SimplenetEvent + Eq + PartialEq>(
-    In(msg) : In<T>,
-    reader  : ClientMessageReader<DemoChannel, T>
+    In(msg): In<T>,
+    reader: ClientMessageReader<DemoChannel, T>,
 ) -> bool
 {
-    for client_msg in reader.iter()
-    {
-        if msg == *client_msg { return true; }
+    for client_msg in reader.iter() {
+        if msg == *client_msg {
+            return true;
+        }
     }
 
     false
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn get_server_requests<Req: SimplenetEvent + Eq + PartialEq, Resp: SimplenetEvent + Eq + PartialEq>(
-    In(client_id) : In<ClientId>,
-    mut reader    : ServerRequestSource<DemoChannel, Req, Resp>
+    In(client_id): In<ClientId>,
+    mut reader: ServerRequestSource<DemoChannel, Req, Resp>,
 ) -> Vec<(RequestToken, Req)>
 {
-    reader.drain()
-        .filter(
-            |(token, _)|
-            {
-                token.client_id() == client_id
-            }
-        )
+    reader
+        .drain()
+        .filter(|(token, _)| token.client_id() == client_id)
         .collect()
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn check_client_received_response<Req: SimplenetEvent + Eq + PartialEq, Resp: SimplenetEvent + Eq + PartialEq>(
-    In(response) : In<ServerResponse<Resp>>,
-    reader       : ClientResponseReader<DemoChannel, Req, Resp>
+    In(response): In<ServerResponse<Resp>>,
+    reader: ClientResponseReader<DemoChannel, Req, Resp>,
 ) -> bool
 {
-    for server_response in reader.iter()
-    {
-        if *server_response == response { return true; }
-    }
-
-    false
-}
-
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-
-fn check_client_connected_on_server(In(client_id): In<ClientId>, reader: ServerConnectionReader<DemoChannel>) -> bool
-{
-    for (connected_id, connection) in reader.iter()
-    {
-        match connection
-        {
-            DemoServerReport::Connected(..) =>
-            {
-                if connected_id == client_id
-                {
-                    return true;
-                }
-            }
-            _ => ()
+    for server_response in reader.iter() {
+        if *server_response == response {
+            return true;
         }
     }
 
@@ -253,23 +206,40 @@ fn check_client_connected_on_server(In(client_id): In<ClientId>, reader: ServerC
 }
 
 //-------------------------------------------------------------------------------------------------------------------
+
+fn check_client_connected_on_server(
+    In(client_id): In<ClientId>,
+    reader: ServerConnectionReader<DemoChannel>,
+) -> bool
+{
+    for (connected_id, connection) in reader.iter() {
+        match connection {
+            DemoServerReport::Connected(..) => {
+                if connected_id == client_id {
+                    return true;
+                }
+            }
+            _ => (),
+        }
+    }
+
+    false
+}
+
 //-------------------------------------------------------------------------------------------------------------------
 
 fn check_client_connected_on_client(reader: ClientConnectionReader<DemoChannel>) -> bool
 {
-    for connection in reader.iter()
-    {
-        match connection
-        {
+    for connection in reader.iter() {
+        match connection {
             bevy_simplenet::ClientReport::Connected => return true,
-            _ => ()
+            _ => (),
         }
     }
 
-    return false
+    return false;
 }
 
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 fn send_client_message<T: SimplenetEvent>(In(msg): In<T>, client: EventClient<DemoChannel>)
@@ -277,7 +247,6 @@ fn send_client_message<T: SimplenetEvent>(In(msg): In<T>, client: EventClient<De
     client.send(msg);
 }
 
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 fn try_send_client_message<T: SimplenetEvent>(In(msg): In<T>, client: EventClient<DemoChannel>) -> bool
@@ -287,7 +256,6 @@ fn try_send_client_message<T: SimplenetEvent>(In(msg): In<T>, client: EventClien
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn send_client_request<Req: SimplenetEvent>(In(request): In<Req>, client: EventClient<DemoChannel>)
 {
@@ -295,44 +263,45 @@ fn send_client_request<Req: SimplenetEvent>(In(request): In<Req>, client: EventC
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
-fn send_server_message<T: SimplenetEvent>(In((client_id, msg)): In<(ClientId, T)>, server: EventServer<DemoChannel>)
+fn send_server_message<T: SimplenetEvent>(
+    In((client_id, msg)): In<(ClientId, T)>,
+    server: EventServer<DemoChannel>,
+)
 {
     server.send(client_id, msg);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn send_server_response<Req: SimplenetEvent, Resp: SimplenetEvent>(
-    In((token, response)) : In<(RequestToken, Resp)>,
-    server                : EventServer<DemoChannel>
-){
+    In((token, response)): In<(RequestToken, Resp)>,
+    server: EventServer<DemoChannel>,
+)
+{
     server.respond(token, response);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn send_server_ack<Req: SimplenetEvent, Resp: SimplenetEvent>(
-    In(token) : In<RequestToken>,
-    server    : EventServer<DemoChannel>
-){
+    In(token): In<RequestToken>,
+    server: EventServer<DemoChannel>,
+)
+{
     server.ack(token);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn send_server_reject<Req: SimplenetEvent, Resp: SimplenetEvent>(
-    In(token) : In<RequestToken>,
-    server    : EventServer<DemoChannel>
-){
+    In(token): In<RequestToken>,
+    server: EventServer<DemoChannel>,
+)
+{
     server.reject(token);
 }
 
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 fn disconnect_client_on_server(In(client_id): In<ClientId>, server: EventServer<DemoChannel>)
@@ -341,14 +310,12 @@ fn disconnect_client_on_server(In(client_id): In<ClientId>, server: EventServer<
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 fn disconnect_client_on_client(client: EventClient<DemoChannel>)
 {
     client.close();
 }
 
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 // client connection
@@ -397,7 +364,12 @@ fn server_multisystem_reader()
     let url = setup_server(&mut server_app);
     let client_id1 = 0u128;
     let client_id2 = 1u128;
-    setup_client(&mut client_app1, url.clone(), client_id1, DemoConnectMsg(String::default()));
+    setup_client(
+        &mut client_app1,
+        url.clone(),
+        client_id1,
+        DemoConnectMsg(String::default()),
+    );
     setup_client(&mut client_app2, url, client_id2, DemoConnectMsg(String::default()));
 
     setup_event_app(&mut server_app);
@@ -417,8 +389,12 @@ fn server_multisystem_reader()
     assert_eq!(client_app1.world_mut().syscall((), num_connection_events_client), 1);
     assert_eq!(client_app2.world_mut().syscall((), num_connection_events_client), 1);
 
-    client_app1.world_mut().syscall(DemoMsg1(10), send_client_message::<DemoMsg1>);
-    client_app1.world_mut().syscall(DemoMsg2(20), send_client_message::<DemoMsg2>);
+    client_app1
+        .world_mut()
+        .syscall(DemoMsg1(10), send_client_message::<DemoMsg1>);
+    client_app1
+        .world_mut()
+        .syscall(DemoMsg2(20), send_client_message::<DemoMsg2>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -448,7 +424,12 @@ fn client_multisystem_reader()
     let url = setup_server(&mut server_app);
     let client_id1 = 0u128;
     let client_id2 = 1u128;
-    setup_client(&mut client_app1, url.clone(), client_id1, DemoConnectMsg(String::default()));
+    setup_client(
+        &mut client_app1,
+        url.clone(),
+        client_id1,
+        DemoConnectMsg(String::default()),
+    );
     setup_client(&mut client_app2, url, client_id2, DemoConnectMsg(String::default()));
 
     setup_event_app(&mut server_app);
@@ -468,8 +449,12 @@ fn client_multisystem_reader()
     assert_eq!(client_app1.world_mut().syscall((), num_connection_events_client), 1);
     assert_eq!(client_app2.world_mut().syscall((), num_connection_events_client), 1);
 
-    server_app.world_mut().syscall((client_id1, DemoMsg1(10)), send_server_message::<DemoMsg1>);
-    server_app.world_mut().syscall((client_id1, DemoMsg2(20)), send_server_message::<DemoMsg2>);
+    server_app
+        .world_mut()
+        .syscall((client_id1, DemoMsg1(10)), send_server_message::<DemoMsg1>);
+    server_app
+        .world_mut()
+        .syscall((client_id1, DemoMsg2(20)), send_server_message::<DemoMsg2>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -485,7 +470,6 @@ fn client_multisystem_reader()
     assert!(client_app1.world_mut().syscall(DemoMsg1(10), check_client_received_message::<DemoMsg1>));
     assert!(client_app1.world_mut().syscall(DemoMsg2(20), check_client_received_message::<DemoMsg2>));
 }
-
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -525,19 +509,26 @@ fn client_request()
     assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
     assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    client_app.world_mut().syscall(DemoRequest1(1), send_client_request::<DemoRequest1>);
+    client_app
+        .world_mut()
+        .syscall(DemoRequest1(1), send_client_request::<DemoRequest1>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     server_app.update();
     client_app.update();
 
-    let mut reqs = server_app.world_mut().syscall(client_id, get_server_requests::<DemoRequest1, DemoResponse1>);
+    let mut reqs = server_app
+        .world_mut()
+        .syscall(client_id, get_server_requests::<DemoRequest1, DemoResponse1>);
     let (token, req) = reqs.pop().unwrap();
     let request_id = token.request_id();
     assert_eq!(req, DemoRequest1(1));
 
-    server_app.world_mut().syscall((token, DemoResponse1(2)), send_server_response::<DemoRequest1, DemoResponse1>);
+    server_app.world_mut().syscall(
+        (token, DemoResponse1(2)),
+        send_server_response::<DemoRequest1, DemoResponse1>,
+    );
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -592,24 +583,35 @@ fn client_request_acked_rejected()
     assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
     assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    client_app.world_mut().syscall(DemoRequest2(2), send_client_request::<DemoRequest2>);
-    client_app.world_mut().syscall(DemoRequest2(22), send_client_request::<DemoRequest2>);
+    client_app
+        .world_mut()
+        .syscall(DemoRequest2(2), send_client_request::<DemoRequest2>);
+    client_app
+        .world_mut()
+        .syscall(DemoRequest2(22), send_client_request::<DemoRequest2>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     server_app.update();
     client_app.update();
 
-    let mut requests = server_app.world_mut().syscall(client_id, get_server_requests::<DemoRequest2, ()>);
+    let mut requests = server_app
+        .world_mut()
+        .syscall(client_id, get_server_requests::<DemoRequest2, ()>);
     let (token1, req1) = requests.pop().unwrap();
     let (token2, req2) = requests.pop().unwrap();
     let request_id1 = token1.request_id();
     let request_id2 = token2.request_id();
-    let mut reqs = [req1, req2]; reqs.sort();
+    let mut reqs = [req1, req2];
+    reqs.sort();
     assert_eq!(reqs, [DemoRequest2(2), DemoRequest2(22)]);
 
-    server_app.world_mut().syscall(token1, send_server_ack::<DemoRequest2, ()>);
-    server_app.world_mut().syscall(token2, send_server_reject::<DemoRequest2, ()>);
+    server_app
+        .world_mut()
+        .syscall(token1, send_server_ack::<DemoRequest2, ()>);
+    server_app
+        .world_mut()
+        .syscall(token2, send_server_reject::<DemoRequest2, ()>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -652,8 +654,12 @@ fn client_server_shared_app()
     assert!(shared_app.world_mut().syscall(client_id, check_client_connected_on_server));
     assert!(shared_app.world_mut().syscall((), check_client_connected_on_client));
 
-    shared_app.world_mut().syscall((client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
-    shared_app.world_mut().syscall(DemoMsg1(11), send_client_message::<DemoMsg1>);
+    shared_app
+        .world_mut()
+        .syscall((client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
+    shared_app
+        .world_mut()
+        .syscall(DemoMsg1(11), send_client_message::<DemoMsg1>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -700,9 +706,13 @@ fn client_drops_old_server_msg()
     assert!(server_app.world_mut().syscall(client_id, check_client_connected_on_server));
     assert!(client_app.world_mut().syscall((), check_client_connected_on_client));
 
-    server_app.world_mut().syscall((client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
+    server_app
+        .world_mut()
+        .syscall((client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
     std::thread::sleep(std::time::Duration::from_millis(50));
-    server_app.world_mut().syscall(client_id, disconnect_client_on_server);
+    server_app
+        .world_mut()
+        .syscall(client_id, disconnect_client_on_server);
 
     std::thread::sleep(std::time::Duration::from_millis(200));
 
@@ -747,23 +757,36 @@ fn client_loses_old_server_response()
     assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
     assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    client_app.world_mut().syscall(DemoRequest1(1), send_client_request::<DemoRequest1>);
-    client_app.world_mut().syscall(DemoRequest1(2), send_client_request::<DemoRequest1>);
+    client_app
+        .world_mut()
+        .syscall(DemoRequest1(1), send_client_request::<DemoRequest1>);
+    client_app
+        .world_mut()
+        .syscall(DemoRequest1(2), send_client_request::<DemoRequest1>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     server_app.update();
 
-    let mut requests = server_app.world_mut().syscall(client_id, get_server_requests::<DemoRequest1, DemoResponse1>);
+    let mut requests = server_app
+        .world_mut()
+        .syscall(client_id, get_server_requests::<DemoRequest1, DemoResponse1>);
     let (token1, _req1) = requests.pop().unwrap();
     let (token2, _req2) = requests.pop().unwrap();
     let request_id1 = token1.request_id();
     let request_id2 = token2.request_id();
 
-    server_app.world_mut().syscall((token1, DemoResponse1(1)), send_server_response::<DemoRequest1, DemoResponse1>);
-    server_app.world_mut().syscall(token2, send_server_ack::<DemoRequest1, DemoResponse1>);
+    server_app.world_mut().syscall(
+        (token1, DemoResponse1(1)),
+        send_server_response::<DemoRequest1, DemoResponse1>,
+    );
+    server_app
+        .world_mut()
+        .syscall(token2, send_server_ack::<DemoRequest1, DemoResponse1>);
     std::thread::sleep(std::time::Duration::from_millis(50));
-    server_app.world_mut().syscall(client_id, disconnect_client_on_server);
+    server_app
+        .world_mut()
+        .syscall(client_id, disconnect_client_on_server);
 
     std::thread::sleep(std::time::Duration::from_millis(200));
 
@@ -856,10 +879,16 @@ fn server_drops_old_client_msg()
     assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
     assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    client_app.world_mut().syscall(DemoMsg1(1), send_client_message::<DemoMsg1>);
-    client_app.world_mut().syscall(DemoRequest1(11), send_client_request::<DemoRequest1>);
+    client_app
+        .world_mut()
+        .syscall(DemoMsg1(1), send_client_message::<DemoMsg1>);
+    client_app
+        .world_mut()
+        .syscall(DemoRequest1(11), send_client_request::<DemoRequest1>);
     std::thread::sleep(std::time::Duration::from_millis(50));
-    client_app.world_mut().syscall((), disconnect_client_on_client);
+    client_app
+        .world_mut()
+        .syscall((), disconnect_client_on_client);
 
     std::thread::sleep(std::time::Duration::from_millis(200));
 
@@ -901,12 +930,16 @@ fn server_send_blocked_until_read_connect()
     server_app.update();
     client_app.update();
 
-    server_app.world_mut().syscall((client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
+    server_app
+        .world_mut()
+        .syscall((client_id, DemoMsg1(1)), send_server_message::<DemoMsg1>);
 
     assert_eq!(server_app.world_mut().syscall((), num_connection_events_server), 1);
     assert_eq!(client_app.world_mut().syscall((), num_connection_events_client), 1);
 
-    server_app.world_mut().syscall((client_id, DemoMsg1(10)), send_server_message::<DemoMsg1>);
+    server_app
+        .world_mut()
+        .syscall((client_id, DemoMsg1(10)), send_server_message::<DemoMsg1>);
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 

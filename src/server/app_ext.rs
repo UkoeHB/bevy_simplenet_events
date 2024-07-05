@@ -1,13 +1,8 @@
-//local shortcuts
-use crate::*;
-
-//third-party shortcuts
 use bevy_app::{App, First};
 use bevy_ecs::prelude::*;
 use bevy_simplenet::{Server, ServerEvent, ServerReport};
 
-//standard shortcuts
-
+use crate::*;
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -16,48 +11,46 @@ use bevy_simplenet::{Server, ServerEvent, ServerReport};
 //-------------------------------------------------------------------------------------------------------------------
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 type InnerServerEvent<C> = ServerEvent<C, InternalEvent, InternalEvent>;
 
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 
 fn drain_server<E: EventPack>(world: &mut World)
 {
     let mut server = world.remove_resource::<EventServerCore<E>>().unwrap();
-    let queues = world.remove_resource::<EventQueueConnectorServer<E>>().unwrap();
+    let queues = world
+        .remove_resource::<EventQueueConnectorServer<E>>()
+        .unwrap();
     let registry = world.remove_resource::<EventRegistry<E>>().unwrap();
 
     // clear existing events
     queues.clear_all(world);
 
     // drain events
-    while let Some((counter, session_id, event)) = server.next()
-    {
-        match event
-        {
-            InnerServerEvent::Report(report) =>
-            {
-                match &report
-                {
+    while let Some((counter, session_id, event)) = server.next() {
+        match event {
+            InnerServerEvent::Report(report) => {
+                match &report {
                     ServerReport::<E::ConnectMsg>::Connected(..) => (),
-                    _                                            => queues.handle_disconnect(world, session_id),
+                    _ => queues.handle_disconnect(world, session_id),
                 }
 
                 queues.send_connection(world, counter, session_id, report);
             }
-            InnerServerEvent::Msg(message) =>
-            {
-                if !registry.has_message_id(message.id)
-                { tracing::trace!("ignoring message with unknown event id"); continue; }
+            InnerServerEvent::Msg(message) => {
+                if !registry.has_message_id(message.id) {
+                    tracing::trace!("ignoring message with unknown event id");
+                    continue;
+                }
 
                 queues.send_message(world, session_id, message.id, message.data);
             }
-            InnerServerEvent::Request(request_token, request) =>
-            {
-                let Some(response_event_id) = registry.get_response_id_from_request_id(request.id)
-                else { tracing::trace!(request.id, "ignoring request with unknown event id"); continue; };
+            InnerServerEvent::Request(request_token, request) => {
+                let Some(response_event_id) = registry.get_response_id_from_request_id(request.id) else {
+                    tracing::trace!(request.id, "ignoring request with unknown event id");
+                    continue;
+                };
 
                 queues.send_request(world, request.id, response_event_id, request_token, request.data);
             }
@@ -70,7 +63,6 @@ fn drain_server<E: EventPack>(world: &mut World)
 }
 
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 
 pub trait SimplenetServerEventAppExt
 {
@@ -82,8 +74,7 @@ impl SimplenetServerEventAppExt for App
 {
     fn insert_simplenet_server<E: EventPack>(&mut self, server: Server<EventWrapper<E>>) -> &mut Self
     {
-        if self.world().contains_resource::<EventServerCore<E>>()
-        {
+        if self.world().contains_resource::<EventServerCore<E>>() {
             panic!("event server was already inserted");
         }
 

@@ -1,12 +1,9 @@
-//local shortcuts
-use crate::*;
+use std::marker::PhantomData;
 
-//third-party shortcuts
 use bevy_ecs::prelude::*;
 use bevy_simplenet::ClientReport;
 
-//standard shortcuts
-use std::marker::PhantomData;
+use crate::*;
 
 //-------------------------------------------------------------------------------------------------------------------
 
@@ -39,7 +36,10 @@ impl<E: EventPack> ClientConnectionQueue<E>
 
 impl<E: EventPack> Default for ClientConnectionQueue<E>
 {
-    fn default() -> Self { Self{ queue: Vec::default(), phantom: PhantomData::default() } }
+    fn default() -> Self
+    {
+        Self { queue: Vec::default(), phantom: PhantomData::default() }
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -71,7 +71,10 @@ impl<E: EventPack, T: SimplenetEvent> ClientMessageQueue<E, T>
 
 impl<E: EventPack, T: SimplenetEvent> Default for ClientMessageQueue<E, T>
 {
-    fn default() -> Self { Self{ queue: Vec::default(), phantom: PhantomData::default() } }
+    fn default() -> Self
+    {
+        Self { queue: Vec::default(), phantom: PhantomData::default() }
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -92,16 +95,15 @@ impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ClientResponseQueu
 
     pub(crate) fn reset(&mut self)
     {
-        for response in self.queue.iter_mut()
-        {
-            let need_reset = match response
-            {
-                ServerResponse::Response(_, id) |
-                ServerResponse::Ack(id)         => Some(*id),
-                _                                => None,
+        for response in self.queue.iter_mut() {
+            let need_reset = match response {
+                ServerResponse::Response(_, id) | ServerResponse::Ack(id) => Some(*id),
+                _ => None,
             };
             tracing::warn!("'losing' server response older than a recent disconnect");
-            if let Some(id) = need_reset { *response = ServerResponse::<Resp>::ResponseLost(id); }
+            if let Some(id) = need_reset {
+                *response = ServerResponse::<Resp>::ResponseLost(id);
+            }
         }
     }
 
@@ -118,7 +120,10 @@ impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> ClientResponseQueu
 
 impl<E: EventPack, Req: SimplenetEvent, Resp: SimplenetEvent> Default for ClientResponseQueue<E, Req, Resp>
 {
-    fn default() -> Self { Self{ queue: Vec::default(), phantom: PhantomData::default() } }
+    fn default() -> Self
+    {
+        Self { queue: Vec::default(), phantom: PhantomData::default() }
+    }
 }
 
 //-------------------------------------------------------------------------------------------------------------------

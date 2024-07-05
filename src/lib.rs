@@ -1,6 +1,5 @@
 //features
 #![cfg_attr(docsrs, feature(doc_cfg))]
-
 //documentation
 #![doc = include_str!("../README.md")]
 #[allow(unused_imports)]
@@ -19,12 +18,11 @@ mod client;
 mod server;
 
 //API exports
-pub use crate::core::*;
-pub(crate) use crate::event_registry::*;
+pub use bevy_simplenet_events_derive::*;
 
 #[cfg(feature = "client")]
 pub use crate::client::*;
+pub use crate::core::*;
+pub(crate) use crate::event_registry::*;
 #[cfg(feature = "server")]
 pub use crate::server::*;
-
-pub use bevy_simplenet_events_derive::*;
