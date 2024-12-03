@@ -283,6 +283,7 @@ fn read_server_responses(reader: ClientResponseReader<DemoChannel, DemoRequest1,
 
 | bevy   | bevy_simplenet_events |
 |--------|-----------------------|
+| 0.15   | v0.5                  |
 | 0.14   | v0.4                  |
 | 0.13   | v0.3                  |
 | 0.12   | v0.1 - v0.2           |

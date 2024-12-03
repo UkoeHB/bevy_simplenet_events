@@ -2,7 +2,7 @@
 name = "bevy_simplenet_events"
 description = "Event-based networking API built on bevy_simplenet"
 authors = ["koe <ukoe@protonmail.com>"]
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 keywords = ["gamedev", "networking", "wasm", "events"]
 license = "MIT OR Apache-2.0"
@@ -38,10 +38,10 @@ client = ["bevy_simplenet/client"]
 server = ["bevy_simplenet/server"]
 
 [dependencies]
-bevy_app       = { version = "0.14", default-features = false }
-bevy_ecs       = { version = "0.14", default-features = false }
-bevy_cobweb    = { version = "0.8" }
-bevy_simplenet = { version = "0.12", default-features = false }
+bevy_app       = { version = "0.15", default-features = false }
+bevy_ecs       = { version = "0.15", default-features = false }
+bevy_cobweb    = { version = "0.13" }
+bevy_simplenet = { version = "0.14", default-features = false }
 bincode        = { version = "1.3" }
 crossbeam      = { version = "0.8" }
 serde          = { version = "1.0" }
